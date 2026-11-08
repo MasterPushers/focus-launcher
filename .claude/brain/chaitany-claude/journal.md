@@ -859,3 +859,20 @@ restored through the picker and `shared_prefs` showed the new values (the emulat
 home is the stock launcher, so Focus's own screen was opened by intent: white theme, mono font
 and the restored note were all there).
 
+
+## 2026-11-08 · Custom TTF/OTF typeface
+**Asked:** support for TTF and OTF fonts.
+**Done:** `FontChoice.CUSTOM` + `Settings.customFontName`; `ui/theme/CustomFont.kt` imports one
+font through `OpenDocument` (copied in, validated with `Typeface.Builder`); `FocusTheme` maps it,
+falling back to the default face when the file is missing; the split clock measures the font's
+"00:00" width. Appearance → Typeface lists "Choose a font file…" and, once imported, the font by
+name. `SettingsBackupTest` round-trips `CUSTOM` + name. The font file is not in the backup.
+**Verified:** 37 unit tests pass, lint 0 errors (local `sdk.dir` pointed at a writable SDK, where
+Gradle installed platform 36 / build-tools 35; the devshell's Nix SDK is read-only and lacks
+them). On the Pixel 9 emulator (Android 17, debug build), driven through the system file picker:
+a TTF (a mono italic) and an OTF (a bold serif) each imported, the stored file matched the source
+size, the face changed in settings and on home, and the split clock fitted. A text file renamed
+`.ttf` was refused with the toast and left the previous font in place. With the stored file
+deleted, the app restarted in Sans with no crash. That run showed the row still naming the lost
+font, so Appearance now shows Sans when the file is missing (rechecked on the emulator).
+Not checked: a real phone, and variable fonts.

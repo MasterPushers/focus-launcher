@@ -6,7 +6,7 @@ import org.junit.Test
 
 class SettingsBackupTest {
     private val changed = Settings(
-        dark = false, font = FontChoice.MONO, favorites = listOf("a/b", "c/d#10"),
+        dark = false, font = FontChoice.CUSTOM, customFontName = "Inter", favorites = listOf("a/b", "c/d#10"),
         hidden = setOf("x/y"), renames = mapOf("a/b" to "Mail"), appLimits = mapOf("com.x" to 15, "com.y" to 0),
         socialDefaultMin = 45, doubleTapLock = false, note = "milk", showMusic = true,
     )

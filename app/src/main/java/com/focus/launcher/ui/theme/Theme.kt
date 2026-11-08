@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -75,10 +77,15 @@ val LocalTextScale = staticCompositionLocalOf { 1f }
 @Composable
 fun FocusTheme(settings: Settings, content: @Composable () -> Unit) {
     val colors = if (settings.dark) BlackTheme else WhiteTheme
-    val font = when (settings.font) {
-        FontChoice.SANS -> FontFamily.Default
-        FontChoice.SERIF -> FontFamily.Serif
-        FontChoice.MONO -> FontFamily.Monospace
+    val context = LocalContext.current
+    val font = remember(settings.font, settings.customFontName) {
+        when (settings.font) {
+            FontChoice.SANS -> FontFamily.Default
+            FontChoice.SERIF -> FontFamily.Serif
+            FontChoice.MONO -> FontFamily.Monospace
+            // Missing after a restore on another phone: fall back to the default face.
+            FontChoice.CUSTOM -> CustomFont.typeface(context)?.let { FontFamily(it) } ?: FontFamily.Default
+        }
     }
     CompositionLocalProvider(
         LocalFocusColors provides colors,
