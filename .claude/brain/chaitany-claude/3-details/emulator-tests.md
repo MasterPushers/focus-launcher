@@ -87,7 +87,9 @@ Two `connected` lines in one test would confirm the re-bind theory; then evaluat
   else: exit 0, nothing runs. Reacts 👀 (or "confused" on a bad command). Resolves the PR head SHA.
 - **build**: checkout of that SHA (no credentials) → copied to `$RUNNER_TEMP/src`, plus a minimal
   SDK copy (licenses, `platforms/android-<compileSdk>`, `build-tools/3[5-9].*`) → built in
-  `eclipse-temurin:21-jdk` with git installed: unit tests, debug APK, test APK, fixtures. APKs
+  `eclipse-temurin:21-jdk`, default Docker network, **no apt** (git used to be installed from
+  Ubuntu's servers; they were down on 2026-11-11, so the image's lack of git is accepted: the test
+  APK reads version "1.1", no build number): unit tests, debug APK, test APK, fixtures. APKs
   are taken out only if `realpath` stays inside the copy and they are regular files; `aapt2`
   confirms `com.focus.launcher`. Artifact `apk`.
 - **emulator** (matrix): sparse checkout of `e2e/` **from main**, `reactivecircus/
@@ -99,8 +101,14 @@ Two `connected` lines in one test would confirm the re-bind theory; then evaluat
   run only in a container with no token, no cache and no runner access; nothing from the PR runs
   on the host. Residual: the PR head is resolved seconds after the comment (a push in between
   would be tested instead); the result comment names the SHA.
-- GitHub runs `issue_comment` and `workflow_dispatch` workflows from the default branch only:
-  the workflow does nothing until it is on `main`. Untested on GitHub as of 2026-11-11.
+- GitHub lists `issue_comment` and `workflow_dispatch` workflows from the default branch only,
+  but a manual run on another branch uses that branch's copy of the file:
+  `gh workflow run test-build.yml --ref <branch> -f apis="26 36"` tries a change before `main`.
+- **First GitHub run (2026-11-11, run 43056994088, by hand on a branch):** container build and
+  unit tests passed; all 7 tests passed on Android 8.0 (API 26) and 16 (API 36), x86_64
+  google_apis, about 5 min each after boot; artifacts `apk` (9 MB), `android-api-26` (4 MB),
+  `android-api-36` (7 MB). The emulator runner's "ERROR | Unable to connect to adb daemon" and
+  "stop: Not implemented" lines are its normal noise. Not yet seen: a real `/test-build` comment.
 
 ## Commands
 ```bash

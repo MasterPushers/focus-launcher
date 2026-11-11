@@ -69,6 +69,10 @@ updated: the owner was told to back both up. A `dist` APK cannot be installed ov
   script from main, and comments the verdict with pictures, video and APK as artifacts. Only works
   once the file is on `main`. Build checks the test-writing rules on every PR
   (`e2e/check-test-rules.sh`). Details: `3-details/emulator-tests.md`.
+- **Site pictures need `rsvg-convert`** (Build and Publish): `site/need-rsvg.sh` installs it from
+  Ubuntu's servers, and when those fail (owner's wish after the 2026-11-11 outage) runs it from a
+  Debian container (`debian:stable-slim` + librsvg2-bin + DejaVu/Liberation fonts) through a
+  wrapper on PATH. No workflow step depends on Ubuntu's servers alone any more.
 - **Versions** are `<baseVersion>.<number of commits>`; the build number is the `versionCode`.
 - **Collaborators' pull requests** are reviewed before anything is built for the phone or the
   public download. Checklist and reasoning: `3-details/ci-and-releases.md`.

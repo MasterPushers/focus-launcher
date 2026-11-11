@@ -885,3 +885,12 @@ and the restored note were all there).
 - Not verified: anything on GitHub's emulators (first real `/test-build` still to come), Android
   8.0 (API 26), x86_64 images, the container build on a runner. Open PRs from before this
   (#52, #42, #41, #40, #25) need `main` merged in before `/test-build` can test them.
+- 2026-11-11 (follow-up, after the push): the first GitHub runs failed: Ubuntu's package servers
+  were unreachable (from GitHub and from the Mac), which broke the Test build container (apt for
+  git) and Build's site step (apt for rsvg-convert). Fixed on a temporary branch, tried there with
+  manual runs, then pushed to `main` at the owner's word ("yes push on the main"): no apt in the
+  container; `site/need-rsvg.sh` with a Debian-container fallback (owner: "use debian base image
+  as backup"). Verified on GitHub: Test build on the branch passed fully, 7/7 on Android 8.0 and
+  16. Build on the branch (run 43058725217) took the Debian route while Ubuntu was still down
+  ("rsvg-convert version 2.60.0") and passed.
+

@@ -242,3 +242,10 @@ Each entry: symptom → cause → fix / rule. Add to this whenever something cos
   `StaleObjectException`. Cause: `Environment` ran `cmd package set-home-activity` at the start
   of every run. Fix: `e2e/run-on-emulator.sh` sets it only when Focus is not home yet and waits
   until Focus stays in front; the tests only check it (`cmd package resolve-activity … HOME`).
+- **Ubuntu's package servers can be down for everyone** (2026-11-11: `archive.ubuntu.com` and
+  `security.ubuntu.com` did not resolve from GitHub's runners or from the owner's Mac; Docker Hub,
+  Google, Maven and Debian did). Symptom: "Temporary failure resolving", apt exit 100, in Build,
+  in the Test build container, and it would have hit Publish. It first looked like a container
+  network problem; `dig` from the Mac showed it was Ubuntu. Fix: the Test build container does
+  without apt; the site's `rsvg-convert` falls back to a Debian container (`site/need-rsvg.sh`).
+  Check the outside world (`dig`, another machine) before blaming the runner.
