@@ -17,8 +17,8 @@ name: Test build
 # Why the build runs in a container. A comment workflow runs with the trust of main, not of the
 # pull request: what it writes to GitHub's cache is read later by builds on main, the one that
 # signs releases among them. A pull request's Gradle files are code. So the pull request is built
-# inside a Docker container that gets a copy of the source, a copy of the SDK and nothing else: no
-# token, no cache, no access to the runner. Outside the container only this repository's own steps
+# inside a Docker container that gets a copy of the source, a copy of the SDK and the network, and
+# nothing else: no token, no cache, no access to the runner's processes or files. Outside the container only this repository's own steps
 # run, the script that drives the emulator comes from main, and the pull request's tests and APKs
 # run inside the emulator. Even so, read the diff before you write /test-build: it is your word
 # that the code may run.
@@ -169,7 +169,10 @@ jobs:
           fixtures=""
           if [ -f checkout/e2e/fixtures/settings.gradle.kts ]; then fixtures=yes; fi
           status=0
-          docker run --rm \
+          # --network host: the container's own network could not resolve any name on the runner
+          # (first run, 2026-11-11), and the build has to download Gradle and its libraries.
+          # The container still gets no token, no cache, and no view of the runner's processes or files.
+          docker run --rm --network host \
             -v "$RUNNER_TEMP/src:/src" -w /src \
             -v "$RUNNER_TEMP/sdk:/sdk" -e ANDROID_HOME=/sdk -e ANDROID_SDK_ROOT=/sdk \
             -e TASKS="$tasks" -e FIXTURES="$fixtures" \
