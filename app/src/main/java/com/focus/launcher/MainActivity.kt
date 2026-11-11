@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LifecycleStartEffect
@@ -36,6 +37,7 @@ import com.focus.launcher.data.AppEntry
 import com.focus.launcher.data.Settings
 import com.focus.launcher.service.WeeklyReview
 import com.focus.launcher.ui.drawer.AppMenu
+import com.focus.launcher.ui.TestTags
 import com.focus.launcher.ui.drawer.DrawerScreen
 import com.focus.launcher.ui.home.HomeScreen
 import com.focus.launcher.ui.home.homeDragging
@@ -190,7 +192,7 @@ private fun Launcher(settings: Settings, homePresses: Flow<Unit>) {
         // The page being left fades and sinks back a touch while the other one arrives. Done in
         // graphicsLayer, which runs in the draw phase: the swipe never triggers a recomposition.
         Box(
-            Modifier.fillMaxSize().graphicsLayer {
+            Modifier.fillMaxSize().testTag(if (page == 0) TestTags.HOME_PAGE else TestTags.APP_LIST).graphicsLayer {
                 val distance = ((pager.currentPage - page) + pager.currentPageOffsetFraction).absoluteValue.coerceIn(0f, 1f)
                 // Text on a flat background never overlaps itself, so each draw call can simply be
                 // made more transparent. The default would render the whole page into a full-screen

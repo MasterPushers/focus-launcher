@@ -77,6 +77,10 @@ ui/     theme/ components/ home/ drawer/ block/ review/ settings/   + Launching.
   (use `currentLocale()` and `collectAsStateWithLifecycle`).
 
 ## Quality bar
+7 emulator tests (`app/src/androidTest/.../e2e`, real app as home screen, UI Automator; run with
+`e2e/run-on-emulator.sh` or `/test-build`; `3-details/emulator-tests.md`). They find screens by
+`ui/TestTags.kt`: keep those tags when reworking the home pager, the search field or the wall.
+The timer service logs its decisions: `adb logcat -s FocusTimer` (connected, "wall in N s", wall).
 33 unit tests pass (tracker 13, emoji 6, settings 7, music linger 7; `org.json` is a test-only
 dependency because the JVM has none); `lintDebug` = 0 errors (remaining warnings are "newer
 version available", deliberate: newer AndroidX needs compileSdk 37 + AGP 9.1). 37 Kotlin files,
@@ -87,4 +91,4 @@ Release APK = 1,366,083 bytes (≈ 1.37 MB). Version **1.1** (`versionCode` 2) s
 ## Tier 3 pointers
 `usage-tracking.md` · `app-classification.md` · `timers-wall-consent.md` · `weekly-review.md` ·
 `home-drawer-menu-setup.md` · `ui-system.md` · `calendar.md` · `performance.md` ·
-`toolchain-and-build.md` · `mistakes-and-lessons.md`
+`toolchain-and-build.md` · `emulator-tests.md` · `mistakes-and-lessons.md`

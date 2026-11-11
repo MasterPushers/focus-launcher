@@ -32,6 +32,8 @@ android {
         // 1.1 was published with versionCode 2; commit counts passed that long ago.
         versionCode = maxOf(buildNumber, 2)
         versionName = if (buildNumber > 0) "$baseVersion.$buildNumber" else baseVersion
+        // The emulator tests in src/androidTest (see e2e/README.md). Only the separate test APK uses it.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     // The key for anything that leaves this machine. keystore.properties (git-ignored) says where
@@ -122,4 +124,9 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.org.json)   // the JVM has no org.json of its own; Android does
+
+    // Emulator tests (e2e/README.md): they drive the real app through UI Automator.
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.uiautomator)
 }
