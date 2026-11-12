@@ -859,20 +859,38 @@ restored through the picker and `shared_prefs` showed the new values (the emulat
 home is the stock launcher, so Focus's own screen was opened by intent: white theme, mono font
 and the restored note were all there).
 
+## 2026-11-11: Emulator tests and the maintainer-only /test-build command
+- Asked: run the app on emulators in CI, started only by a maintainer's `/test-build` comment,
+  with video and screenshots; then "real" end-to-end tests with an architecture that keeps them
+  correct and does not keep closing apps or hopping between screens. Shown as two diagrams first.
+- Done: `.github/workflows/test-build.yml` (authorize → container build → emulator matrix →
+  PR comment), `e2e/` (README with the rules, `run-on-emulator.sh`, `check-test-rules.sh`,
+  `fixtures/` as a separate Gradle build), 7 journeys + robots + support under
+  `app/src/androidTest/.../e2e`, `ui/TestTags.kt` and four test tags in the app, AndroidX test
+  libraries (test APK only), a rules step in `build.yml`. Details: `3-details/emulator-tests.md`.
+- Verified (local Pixel API 36 emulator, arm64): unit tests and lint (0 errors) pass; the suite
+  passes; each of the 7 tests failed on a deliberate break of its feature and passed again after;
+  `check-test-rules.sh` fails on planted violations; actionlint and shellcheck clean (info only).
+  Runs 1–3 found test bugs, not app bugs (stored selectors, capitalised headings, usage carried
+  over between runs, typo-tolerant search); lessons in `mistakes-and-lessons.md`.
+- The owner ruled out flaky tests ("keep chasing it"). Repeated runs found two setup races
+  (unbound service after a force-stop, home-screen restart), both fixed; one service-test failure
+  stays unexplained, no repeat in the 25 runs since (`3-details/emulator-tests.md`). Added
+  `FocusTimer` log lines to the service and `dumpsys accessibility` to the failure evidence.
+- Pushed to `main` at the owner's request ("push the code change on the main directly"), from a
+  worktree of `origin/main` (14 commits ahead of this checkout: fast-app dragging, settings
+  backup, action bumps): only this work's files, action pins matched to main's, then build, unit
+  tests, lint and one full emulator run on that code (7/7). The push touches the app, so Publish
+  starts and waits for the owner's approval; approving it releases these changes.
+- Not verified: anything on GitHub's emulators (first real `/test-build` still to come), Android
+  8.0 (API 26), x86_64 images, the container build on a runner. Open PRs from before this
+  (#52, #42, #41, #40, #25) need `main` merged in before `/test-build` can test them.
+- 2026-11-11 (follow-up, after the push): the first GitHub runs failed: Ubuntu's package servers
+  were unreachable (from GitHub and from the Mac), which broke the Test build container (apt for
+  git) and Build's site step (apt for rsvg-convert). Fixed on a temporary branch, tried there with
+  manual runs, then pushed to `main` at the owner's word ("yes push on the main"): no apt in the
+  container; `site/need-rsvg.sh` with a Debian-container fallback (owner: "use debian base image
+  as backup"). Verified on GitHub: Test build on the branch passed fully, 7/7 on Android 8.0 and
+  16. Build on the branch (run 43058725217) took the Debian route while Ubuntu was still down
+  ("rsvg-convert version 2.60.0") and passed.
 
-## 2026-11-08 · Custom TTF/OTF typeface
-**Asked:** support for TTF and OTF fonts.
-**Done:** `FontChoice.CUSTOM` + `Settings.customFontName`; `ui/theme/CustomFont.kt` imports one
-font through `OpenDocument` (copied in, validated with `Typeface.Builder`); `FocusTheme` maps it,
-falling back to the default face when the file is missing; the split clock measures the font's
-"00:00" width. Appearance → Typeface lists "Choose a font file…" and, once imported, the font by
-name. `SettingsBackupTest` round-trips `CUSTOM` + name. The font file is not in the backup.
-**Verified:** 37 unit tests pass, lint 0 errors (local `sdk.dir` pointed at a writable SDK, where
-Gradle installed platform 36 / build-tools 35; the devshell's Nix SDK is read-only and lacks
-them). On the Pixel 9 emulator (Android 17, debug build), driven through the system file picker:
-a TTF (a mono italic) and an OTF (a bold serif) each imported, the stored file matched the source
-size, the face changed in settings and on home, and the split clock fitted. A text file renamed
-`.ttf` was refused with the toast and left the previous font in place. With the stored file
-deleted, the app restarted in Sans with no crash. That run showed the row still naming the lost
-font, so Appearance now shows Sans when the file is missing (rechecked on the emulator).
-Not checked: a real phone, and variable fonts.

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Dummy Game": Android files it as a game, so Focus must give it the automatic daily limit. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:appCategory="game"
+        android:isGame="true"
+        android:label="Dummy Game">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

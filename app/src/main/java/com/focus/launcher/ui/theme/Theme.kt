@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toDrawable
@@ -93,7 +95,9 @@ fun FocusTheme(settings: Settings, content: @Composable () -> Unit) {
         LocalTextScale provides settings.textScale,
         LocalIndication provides PressIndication,
     ) {
-        Box(Modifier.fillMaxSize().background(colors.bg)) { content() }
+        // testTagsAsResourceId: the emulator tests (UI Automator) can find elements by their test
+        // tag (ui/TestTags.kt). It adds nothing to what is drawn or announced.
+        Box(Modifier.fillMaxSize().background(colors.bg).semantics { testTagsAsResourceId = true }) { content() }
     }
 }
 

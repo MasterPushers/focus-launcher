@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Dummy Mail": Android files it as "social" (as Play does with mail clients), but it handles
+     mailto: links. Focus must see a mail tool in it and never limit it on its own. The package
+     name says nothing about mail on purpose: only the mailto: handler can give it away. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:appCategory="social"
+        android:label="Dummy Mail">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SENDTO" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="mailto" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

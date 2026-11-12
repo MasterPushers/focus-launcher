@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.util.LruCache
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Toast
@@ -61,6 +62,7 @@ class FocusAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        Log.i(TAG, "connected")
         instance = this
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
@@ -159,7 +161,10 @@ class FocusAccessibilityService : AccessibilityService() {
             // About to block: confirm with the usage log that this app really is still in front.
             val actuallyInFront = if (remaining <= 0) Graph.usage.lastResumedPackage(since) else null
             main.post {
-                if (gen != generation || currentPkg != pkg) return@post
+                if (gen != generation || currentPkg != pkg) {
+                    Log.i(TAG, "$pkg: result dropped, $currentPkg is in front now")
+                    return@post
+                }
                 when {
                     remaining > 0 -> scheduleFor(pkg, remaining)
                     actuallyInFront != null && actuallyInFront != pkg && actuallyInFront != packageName -> {
@@ -177,6 +182,8 @@ class FocusAccessibilityService : AccessibilityService() {
 
     /** Arms the timer for the moment today's allowance runs out, plus an optional heads-up before it. */
     private fun scheduleFor(pkg: String, remaining: Long) {
+        // One line per visit to a limited app: `adb logcat -s FocusTimer` shows what the service decided.
+        Log.i(TAG, "$pkg: wall in ${remaining / 1000} s")
         main.postDelayed(check, remaining.coerceAtLeast(1_500) + 300)
         val warnMs = Graph.settings.value.warnMinutes * 60_000L
         if (warnMs > 0 && remaining > warnMs + 5_000) {
@@ -209,6 +216,7 @@ class FocusAccessibilityService : AccessibilityService() {
     }
 
     private fun block(pkg: String, usedMs: Long, limit: AppLimit) {
+        Log.i(TAG, "$pkg: wall")
         Graph.limits.recordBlocked(pkg)
         val intent = BlockActivity.intent(this, pkg, usedMs, limit.minutes, midSession = true)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -219,6 +227,8 @@ class FocusAccessibilityService : AccessibilityService() {
     }
 
     companion object {
+        private const val TAG = "FocusTimer"
+
         @Volatile
         private var instance: FocusAccessibilityService? = null
 

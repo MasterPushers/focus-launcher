@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -59,6 +60,7 @@ import com.focus.launcher.data.AppEntry
 import com.focus.launcher.data.DayUsage
 import com.focus.launcher.data.DrawerSort
 import com.focus.launcher.data.Settings
+import com.focus.launcher.ui.TestTags
 import com.focus.launcher.ui.components.ChoiceDialog
 import com.focus.launcher.ui.components.Label
 import com.focus.launcher.ui.components.T
@@ -198,6 +200,7 @@ fun DrawerScreen(
                 onValueChange = onQueryChange,
                 modifier = Modifier
                     .weight(1f)
+                    .testTag(TestTags.APP_SEARCH)
                     .focusRequester(searchFocus)
                     // This page is composed even while the home page is showing. Without this the
                     // off-screen field takes the window's initial focus and pops the keyboard.

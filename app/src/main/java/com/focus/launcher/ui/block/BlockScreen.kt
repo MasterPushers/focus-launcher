@@ -23,6 +23,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.focus.launcher.Graph
 import com.focus.launcher.data.Settings
 import com.focus.launcher.data.WeekSummary
+import com.focus.launcher.ui.TestTags
 import com.focus.launcher.ui.components.FocusButton
 import com.focus.launcher.ui.components.Label
 import com.focus.launcher.ui.components.T
@@ -90,6 +92,7 @@ fun BlockScreen(
     Column(
         Modifier
             .fillMaxSize()
+            .testTag(TestTags.WALL)
             .graphicsLayer {
                 alpha = entrance.value
                 translationY = (1f - entrance.value) * 28.dp.toPx()
