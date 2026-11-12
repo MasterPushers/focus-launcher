@@ -3,7 +3,7 @@ package com.focus.launcher.data
 import org.json.JSONArray
 import org.json.JSONObject
 
-enum class FontChoice(val label: String) { SANS("Sans"), SERIF("Serif"), MONO("Mono") }
+enum class FontChoice(val label: String) { SANS("Sans"), SERIF("Serif"), MONO("Mono"), CUSTOM("Custom") }
 
 /**
  * SPLIT: the clock on the left, one section on the right, a single vertical line between them and
@@ -50,6 +50,8 @@ data class Settings(
     // Appearance
     val dark: Boolean = true,
     val font: FontChoice = FontChoice.SANS,
+    /** File name of the imported TTF/OTF behind [FontChoice.CUSTOM]. The font itself is in files/fonts. */
+    val customFontName: String = "",
     val textScale: Float = 1f,
     val hideStatusBar: Boolean = false,
     val launchAnimation: LaunchAnimation = LaunchAnimation.FAST,
@@ -136,6 +138,7 @@ data class Settings(
         put("v", SCHEMA)
         put("dark", dark)
         put("font", font.name)
+        put("customFontName", customFontName)
         put("textScale", textScale.toDouble())
         put("hideStatusBar", hideStatusBar)
         put("launchAnimation", launchAnimation.name)
@@ -203,6 +206,7 @@ data class Settings(
             return Settings(
                 dark = o.optBoolean("dark", d.dark),
                 font = enumOr(o.optString("font"), d.font),
+                customFontName = o.optString("customFontName", d.customFontName),
                 textScale = o.optDouble("textScale", d.textScale.toDouble()).toFloat().coerceIn(0.8f, 1.4f),
                 hideStatusBar = o.optBoolean("hideStatusBar", d.hideStatusBar),
                 launchAnimation = enumOr(o.optString("launchAnimation"), d.launchAnimation),
