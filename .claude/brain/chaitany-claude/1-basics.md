@@ -49,7 +49,7 @@ device or what is on his phone lives only in the git-ignored `private/` folder n
 | Deploy target | `site/deploy.env` (ignored) |
 | Server, device and phone specifics | `private/` (ignored) |
 | CI · publish · release check | `.github/workflows/` `build.yml` · `publish.yml` · `verify-release.yml` |
-| Live site · repo · releases | https://how2me.me/focusapp/ · https://github.com/patelchaitany/focus-launcher · `/releases` |
+| Live site · repo · releases | https://how2me.me/focusapp/ · https://github.com/MasterPushers/focus-launcher (formerly `patelchaitany/`) · `/releases` |
 
 ## Commands
 ```bash

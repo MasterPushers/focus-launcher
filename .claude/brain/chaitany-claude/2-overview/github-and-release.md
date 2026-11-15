@@ -1,6 +1,6 @@
 # Tier 2 · The public repository, signing, releasing
 
-Repo: **https://github.com/patelchaitany/focus-launcher** · public since 2026-09-19 · branch `main`
+Repo: **https://github.com/MasterPushers/focus-launcher** (the git remote as of 2026-11-15; formerly `patelchaitany/focus-launcher`, and some issue comments link `C-P-S-P/focus-launcher`; whether the old addresses redirect was not checked) · public since 2026-09-19 · branch `main`
 · `gh` is authenticated as the owner on his machine. Homepage field and README point to the site;
 topics set (minimalist-launcher, android-launcher, app-blocker, …).
 
@@ -53,7 +53,7 @@ updated: the owner was told to back both up. A `dist` APK cannot be installed ov
   `main` and every pull request, and attaches the APK to the run. It uses **no secrets**: that APK
   is signed with a throwaway runner key and is not the official download. Brain, notes and site
   changes do not trigger it.
-- **Releases**: https://github.com/patelchaitany/focus-launcher/releases , tag `v<version>`, with
+- **Releases**: https://github.com/MasterPushers/focus-launcher/releases , tag `v<version>`, with
   the very APK the website serves (same SHA-256) plus its `.sha256`. `verify-release.yml` fails
   if an attached APK is not signed with the release key.
 - **Publishing from CI** (owner's choice, 2026-09-20: automatic, with his approval):
@@ -100,10 +100,15 @@ the machine that has the key:
 7. Public: `FOCUS_APK=$(site/clean-build.sh | tail -1) site/deploy.sh` (the APK file name carries
    the version; older APKs stay on the server so old links keep working).
 
+## Issues
+Users file bugs and requests on the repo's issue tracker; maintainers answer there and ask for
+PRs. Triage of 2026-11-15 (which issues are real bugs, with code locations): `3-details/issue-triage.md`.
+Strongest open bugs then: #30 note lost on an outside tap, #53 auto-launch blocked by typo matches.
+
 ## Open
 CI publishing is built but waits for the owner to run the setup script · the F-Droid merge
 request waits for the owner's GitLab account and token.
 
 ## Tier 3 pointers
-`ci-and-releases.md` · `emulator-tests.md` · `fdroid.md` · `signing-keys.md` · `toolchain-and-build.md` · `brain-upkeep.md` (the
+`issue-triage.md` · `ci-and-releases.md` · `emulator-tests.md` · `fdroid.md` · `signing-keys.md` · `toolchain-and-build.md` · `brain-upkeep.md` (the
 brain is part of the repo)

@@ -894,3 +894,17 @@ and the restored note were all there).
   16. Build on the branch (run 43058725217) took the Debian route while Ubuntu was still down
   ("rsvg-convert version 2.60.0") and passed.
 
+
+## 2026-11-15 · Issue triage: which GitHub issues are bug reports
+- Asked: go through all existing issues on the repo and find the bug reports.
+- Did: read all 29 issues (26 open, 3 closed) and their comments through the GitHub MCP, plus the
+  PR list; checked each claimed bug against `main` (`ebcea98`). Results, with code locations, in
+  `3-details/issue-triage.md`; pointer in `2-overview/github-and-release.md`.
+- Verified in code (not on a device): #30's note dialog throws the text away on an outside tap
+  or Back, and opens with everything selected; #53's auto-launch needs exactly one result while
+  typo-tolerant matches add more. Likely: #21 (media buttons ignore the session's declared
+  actions). Plausible, cause outside the code: #29 (open PR #25 aims at it). Limitation: #51.
+- Brain fixes: the git remote is now `MasterPushers/focus-launcher` (Tier 1, Tier 2 updated;
+  whether old addresses redirect was not checked); removed a stray `<<<<<<< HEAD` line from
+  `2-overview/app.md`.
+- Open: nothing fixed in the app; no issue commented on. Fixes wait for the owner's go.
