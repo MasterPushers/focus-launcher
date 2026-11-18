@@ -908,3 +908,17 @@ and the restored note were all there).
   whether old addresses redirect was not checked); removed a stray `<<<<<<< HEAD` line from
   `2-overview/app.md`.
 - Open: nothing fixed in the app; no issue commented on. Fixes wait for the owner's go.
+
+## 2026-11-18 · Closing bug reports not caused by the app
+- Asked: close the bug reports that are not related to the app, with a proper explanation
+  (feature requests stay).
+- Did: re-read the open bug reports against the code and looked up how other launchers open
+  Firefox's search. Closed nothing and posted no comment: every open report either is Focus's
+  own behaviour (#14, #17, #21, #30, #53) or has an outside cause Focus can soften (#29 via
+  PR #25, #51 via a Custom Tab heuristic or the reporter's filter, #33 via Firefox's own intent,
+  as Lawnchair does). #27, the one fully outside Focus, was already closed by its reporter.
+- Verified: the Firefox intent from Lawnchair's source code (developer search); not tried on a
+  device. Recorded the rule in `2-overview/user-and-decisions.md`, details in
+  `3-details/issue-triage.md`.
+- Open: the owner may still want #51 or #29 closed as "outside our control", or an explanation
+  added to #27; both were offered, not done.

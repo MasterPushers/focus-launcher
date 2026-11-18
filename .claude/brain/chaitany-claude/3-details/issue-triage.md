@@ -15,12 +15,20 @@ code" means the code does what the report describes. Re-check before acting: iss
 | 32 (comment) | "No search app found" on a phone without Google and Firefox | Unclear | `Launching.kt` `openWebSearch` tries global search, web search, then `VIEW https://www.google.com/`; failing all four means no browser handled even the last. Not reproduced |
 | 14 | Pinned shortcuts from apps go nowhere; no long-press app shortcuts | Missing feature, not a defect | Manifest has no `CONFIRM_PIN_SHORTCUT` handler and the app menu never reads `LauncherApps.getShortcuts`. Apps that skip `isRequestPinShortcutSupported()` claim success anyway |
 | 17 | Tapping the calendar opens the "today" view, which changes some calendar apps' saved view | Side effect, filed as a request | `HomeScreen.kt` `openCalendarApp` opens `content://com.android.calendar/time/<now>` |
-| 33 | Keyboard does not focus in Firefox's search after the swipe | Third-party behaviour | Depends on how the search app handles the intent from `openWebSearch` |
-| 27 (closed) | Payment / UPI apps refuse to run while Focus's accessibility service is on | Not fixable in Focus | Those apps refuse any enabled accessibility service. Must not be "fixed" by removing the service (owner's rule, Tier 1 #11) |
+| 33 | Keyboard does not focus in Firefox's search after the swipe | **Fixable in Focus**, not Firefox's fault alone | `Launching.kt` `openWebSearch` sends generic search intents. Another launcher (Lawnchair) opens Firefox's search with Firefox's own intent: action `org.mozilla.fenix.OPEN_TAB` on `org.mozilla.fenix.IntentReceiverActivity` (packages `org.mozilla.firefox`, `_beta`, `fennec_fdroid`). Found in Lawnchair's source 2026-11-18; whether it focuses the field was not tried |
+| 27 (closed) | Payment / UPI apps refuse to run while Focus's accessibility service is on | Not fixable in Focus | Those apps refuse any enabled accessibility service. Must not be "fixed" by removing the service (owner's rule, Tier 1 #11). Closed by its reporter on 2026-11-05, with no explanation from the maintainers |
 
 Everything else (14 more open issues and the wishlist #31) is feature requests or project posts.
 The wishlist's comments hold requests only (translations, fast-app presets, unified search,
 landscape, follow-system theme, built-in app lock, corner-shortcut menu, another store).
+
+## Closing "not the app's fault" bugs (owner's ask, 2026-11-18)
+Asked to close the bugs not related to the app, with an explanation. On a second look none of
+the open ones qualified, so none was closed: #29, #51 and #33 have outside causes (OEM memory
+kills, Android's usage API, Firefox) but Focus can soften each (PR #25, a Custom Tab heuristic
+or the reporter's filter, Firefox's own intent); #14 and #17 are Focus's own behaviour. The only
+one entirely outside Focus is #27, already closed. Rule used: close only what Focus cannot
+change at all; otherwise leave it open and say what Focus can do.
 
 ## How this was done
 GitHub MCP `list_issues` (all states, bodies) and `issue_read get_comments` per issue; the code

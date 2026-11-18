@@ -47,6 +47,7 @@
 | **"Reduces the total text on website, keep everything 2 line at max"** (2026-09-21) | Every text block on the page is two lines at most, on a desktop and on a phone (the headline: two on a desktop, three on a phone). New copy has to be measured against that, not estimated |
 | **CI that builds an APK on GitHub** | Tests, lint and an APK on every push and pull request; that APK is signed with a throwaway key |
 | **The site gets the latest APK when CI has built it** (2026-09-20), **automatically, with his approval** (chosen from three options) | `publish.yml`: signs with the real key, uploads, creates the release, after he approves the run. Keys live in a protected GitHub environment; the server upload key can only deliver site files. He switches it on himself with `site/setup-ci-publishing.sh` |
+| **Issue tracker: "close the bugs which not related to app with proper explanation"** (2026-11-18) | Close a bug report only when its cause is entirely outside Focus and Focus cannot change it, always with a comment saying why. Where Focus can soften an outside cause, leave it open. First pass closed nothing (`3-details/issue-triage.md`). Feature requests stay open |
 
 ## Asked for by a contributor (2026-09-19, on a clone); shipped in 1.1 at the owner's request
 | Request | What was done |
