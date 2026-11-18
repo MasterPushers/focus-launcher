@@ -50,6 +50,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -62,6 +63,7 @@ import com.focus.launcher.data.AppEntry
 import com.focus.launcher.data.DayUsage
 import com.focus.launcher.data.DrawerSort
 import com.focus.launcher.data.Settings
+import com.focus.launcher.ui.TestTags
 import com.focus.launcher.ui.components.ChoiceDialog
 import com.focus.launcher.ui.components.Label
 import com.focus.launcher.ui.components.T
@@ -177,6 +179,8 @@ fun DrawerScreen(
         } else {
             focusManager.clearFocus()
             keyboard?.hide()
+            // Back to the top while nobody is looking, so the next visit starts at A, not where the last one ended.
+            listState.scrollToItem(0)
         }
     }
     // stats is a key too: when it arrives the list reorders, and a keyed list would follow the old top row.
@@ -201,6 +205,7 @@ fun DrawerScreen(
                 onValueChange = onQueryChange,
                 modifier = Modifier
                     .weight(1f)
+                    .testTag(TestTags.APP_SEARCH)
                     .focusRequester(searchFocus)
                     // This page is composed even while the home page is showing. Without this the
                     // off-screen field takes the window's initial focus and pops the keyboard.
@@ -390,8 +395,20 @@ private fun AppRow(
 
 private val MARKS = Regex("\\p{Mn}+")
 
-private fun normalize(text: String): String =
-    MARKS.replace(Normalizer.normalize(text, Normalizer.Form.NFD), "").lowercase().trim()
+/**
+ * Latin letters that Unicode does not decompose into a base letter plus a mark, so stripping marks
+ * leaves them as they are: "Łódź" would sort under '#' and never match "lodz" without this.
+ */
+private val UNDECOMPOSED = mapOf(
+    'ł' to "l", 'đ' to "d", 'ø' to "o", 'ħ' to "h", 'ı' to "i",
+    'ß' to "ss", 'æ' to "ae", 'œ' to "oe", 'þ' to "th",
+)
+
+private fun normalize(text: String): String {
+    val plain = MARKS.replace(Normalizer.normalize(text, Normalizer.Form.NFD), "").lowercase().trim()
+    if (plain.none { it in UNDECOMPOSED }) return plain
+    return buildString(plain.length) { plain.forEach { c -> append(UNDECOMPOSED[c] ?: c) } }
+}
 
 /**
  * Filters [apps] by [query]. Best matches first: name starts with the query, then a word in the

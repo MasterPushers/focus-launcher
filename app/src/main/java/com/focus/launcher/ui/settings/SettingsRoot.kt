@@ -1,5 +1,10 @@
 package com.focus.launcher.ui.settings
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.focus.launcher.data.SettingsBackup
+import java.time.LocalDate
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -189,8 +194,49 @@ private fun MainPage(settings: Settings, appCount: Int, status: SetupStatus, onB
 @Composable
 private fun AboutPage(onBack: () -> Unit, go: (String) -> Unit) {
     val c = LocalFocusColors.current
+    val context = LocalContext.current
+    // Resolved here, in composition: the file-picker callbacks below run outside it.
+    val backedUp = stringResource(R.string.settings_toast_backed_up)
+    val writeFailed = stringResource(R.string.settings_toast_backup_failed)
+    val notABackup = stringResource(R.string.settings_toast_not_a_backup)
+    val restoredDone = stringResource(R.string.settings_toast_restored)
+    // Both go through the system's file picker: no permission, and the user chooses where.
+    val backupTo = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val ok = try {
+            context.contentResolver.openOutputStream(uri)?.use { it.write(SettingsBackup.write(Graph.settings.value).toByteArray()) } != null
+        } catch (_: Exception) {
+            false
+        }
+        Toast.makeText(context, if (ok) backedUp else writeFailed, Toast.LENGTH_SHORT).show()
+    }
+    val restoreFrom = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val restored = try {
+            context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }?.let(SettingsBackup::read)
+        } catch (_: Exception) {
+            null
+        }
+        if (restored == null) {
+            Toast.makeText(context, notABackup, Toast.LENGTH_SHORT).show()
+        } else {
+            Graph.settings.update { restored }
+            Toast.makeText(context, restoredDone, Toast.LENGTH_SHORT).show()
+        }
+    }
     Page(stringResource(R.string.settings_about), onBack) {
         SettingRow(stringResource(R.string.settings_about_welcome), subtitle = stringResource(R.string.settings_about_welcome_summary), onClick = { go(Routes.WELCOME) })
+        Section(stringResource(R.string.settings_about_file))
+        SettingRow(
+            stringResource(R.string.settings_about_backup),
+            subtitle = stringResource(R.string.settings_about_backup_summary),
+            onClick = { backupTo.launch("focus-settings-${LocalDate.now()}.json") },
+        )
+        SettingRow(
+            stringResource(R.string.settings_about_restore),
+            subtitle = stringResource(R.string.settings_about_restore_summary),
+            onClick = { restoreFrom.launch(arrayOf("application/json", "text/plain", "*/*")) },
+        )
         Column(Modifier.padding(horizontal = 24.dp, vertical = 12.dp)) {
             T(stringResource(R.string.settings_about_version, BuildConfig.VERSION_NAME), size = 20.sp, weight = FontWeight.Medium)
             VSpace(12.dp)

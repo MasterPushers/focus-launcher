@@ -36,12 +36,17 @@ jobs:
         with:
           fetch-depth: 0   # the build number in the version is the number of commits
 
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
 
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      # The emulator tests themselves run only when a maintainer asks (Test build workflow); that
+      # they are written by the rules (e2e/README.md) is checked on every change.
+      - name: The emulator tests follow the rules
+        run: e2e/check-test-rules.sh
 
       # gradle.properties pins the JDK path of the owner's machine. The runner's JDK is given on
       # the command line instead, which takes precedence, so no tracked file has to change.
@@ -72,18 +77,22 @@ jobs:
             echo "- Signed with a throwaway CI key: for trying out only. It cannot update, or be updated by, the official APK from the website or the release page."
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # rsvg-convert draws two of the site's pictures. From Ubuntu's servers, or from a Debian
+      # container when those are down (site/need-rsvg.sh).
+      - name: rsvg-convert for the site's pictures
+        run: site/need-rsvg.sh
+
       # The Publish workflow builds the site with this same script on this same kind of machine.
       # Doing it here means a change that breaks it is caught in the pull request, not on release day.
       - name: The site builds around this APK
         env:
           APK_NAME: ${{ steps.apk.outputs.name }}
         run: |
-          command -v rsvg-convert >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq librsvg2-bin; }
           FOCUS_APK="$GITHUB_WORKSPACE/out/$APK_NAME" site/build.sh   # absolute: build.sh changes directory
           test -s site/public/index.html && ! grep -q '{{' site/public/index.html
           ls -l site/public
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ steps.apk.outputs.name }}
           path: out/
@@ -92,7 +101,7 @@ jobs:
 
       - name: Keep the reports when something fails
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: reports
           path: |

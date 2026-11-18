@@ -36,6 +36,15 @@
     <!-- O aplikacji -->
     <string name="settings_about_welcome">Ekran powitalny i wskazówki</string>
     <string name="settings_about_welcome_summary">Znów pokazuje wskazówki na ekranie głównym, po jednej.</string>
+    <string name="settings_about_file">Plik ustawień</string>
+    <string name="settings_about_backup">Zapisz kopię ustawień</string>
+    <string name="settings_about_backup_summary">Wszystkie twoje ustawienia (układ, gesty, szybkie aplikacje, zmienione nazwy, minutniki) w jednym małym pliku, zapisanym tam, gdzie wskażesz.</string>
+    <string name="settings_about_restore">Przywróć ustawienia</string>
+    <string name="settings_about_restore_summary">Zastępuje wszystkie ustawienia tymi z pliku kopii. Aplikacje, których tu nie ma, są pomijane.</string>
+    <string name="settings_toast_backed_up">Kopia ustawień zapisana</string>
+    <string name="settings_toast_backup_failed">Nie udało się zapisać pliku</string>
+    <string name="settings_toast_not_a_backup">To nie jest plik ustawień Focus</string>
+    <string name="settings_toast_restored">Ustawienia przywrócone</string>
     <string name="settings_about_text">Launcher, na który nie ma co patrzeć. Bez ikon, bez kolorów, bez feedu: godzina, kilka wybranych przez ciebie aplikacji i uczciwy obraz tego, na co idzie twój dzień.</string>
     <string name="settings_about_privacy">Prywatność</string>
     <string name="settings_about_privacy_text">Focus nie ma uprawnienia do internetu, więc nic, co wie, nie może opuścić tego telefonu. Czas przed ekranem jest odczytywany z dziennika użycia Androida i przechowywany tylko w prywatnej pamięci aplikacji. Usługa minutników widzi nazwę aplikacji na pierwszym planie i nic więcej; nie może odczytać tego, co jest na ekranie.</string>

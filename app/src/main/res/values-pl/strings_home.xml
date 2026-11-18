@@ -28,6 +28,7 @@
     <string name="home_notice_finish_setup">Dokończ konfigurację Focus  →</string>
     <string name="home_tip_counter">WSKAZÓWKA %1$d / %2$d</string>
     <string name="home_toast_double_tap_lock">Włącz usługę minutników Focus, by blokować ekran dwukrotnym kliknięciem</string>
+    <string name="home_toast_no_alarms">Nie udało się otworzyć alarmów</string>
 
     <string name="home_favorites_empty">Przesuń w lewo do swoich aplikacji.\nPrzytrzymaj jedną, by ją tu przypiąć.</string>
 

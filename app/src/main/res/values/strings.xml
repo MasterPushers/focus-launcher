@@ -71,6 +71,8 @@
     <string name="tip_clock_result">set its tap</string>
     <string name="tip_screen_time">Tap screen time</string>
     <string name="tip_screen_time_result">your day</string>
+    <string name="tip_fast_apps">Hold a fast app</string>
+    <string name="tip_fast_apps_result">drag to reorder</string>
     <string name="tip_corners">Long-press a bottom corner</string>
     <string name="tip_corners_result">change it</string>
     <string name="tip_sections">Tap here</string>

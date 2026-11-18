@@ -39,6 +39,17 @@
     <!-- About -->
     <string name="settings_about_welcome">Welcome screen and tips</string>
     <string name="settings_about_welcome_summary">Shows the tips on the home screen again, one at a time.</string>
+    <!-- Section header over backing up and restoring every setting as one file. -->
+    <string name="settings_about_file">Settings file</string>
+    <string name="settings_about_backup">Back up settings</string>
+    <string name="settings_about_backup_summary">Everything you set up (layout, gestures, fast apps, renames, timers) as one small file, saved where you choose.</string>
+    <string name="settings_about_restore">Restore settings</string>
+    <string name="settings_about_restore_summary">Replaces every setting with those in a backup file. Apps that are not installed here are skipped.</string>
+    <!-- Short messages after the file picker closes. -->
+    <string name="settings_toast_backed_up">Settings backed up</string>
+    <string name="settings_toast_backup_failed">Could not write the file</string>
+    <string name="settings_toast_not_a_backup">That is not a Focus settings file</string>
+    <string name="settings_toast_restored">Settings restored</string>
     <!-- %1$s is the version number, e.g. "1.4". -->
     <string name="settings_about_version" translatable="false">Focus %1$s</string>
     <string name="settings_about_text">A launcher with nothing to look at. No icons, no colour, no feed: the time, the few apps you chose, and an honest picture of where your day is going.</string>

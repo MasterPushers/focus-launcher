@@ -42,6 +42,7 @@ ui/     theme/ components/ home/ drawer/ block/ review/ settings/   + Launching.
 <<<<<<< HEAD
 | Music and note sections on home (text, lines between sections, off by default). **Music is only there while something plays** (+1 min after it stops; `Settings.musicAutoHide`, owner 2026-09-20) | `HomeWidgets.kt` `MusicState`, `rememberMusicState`, `MusicSection`, `NoteSection`; `ui/home/MusicLinger.kt` (pure rule, tested); `service/MediaListener.kt`; toggles in `LauncherPages.kt` `HomePage` |
 | Welcome screen (once) and learn-by-doing tips on the home screen | `ui/settings/WelcomePage.kt` (route `welcome`), `data/AppState.kt` `Tip` / `did()` / `tutorialSeen`; hooks in `HomeScreen.kt`, `MainActivity.kt`; drawer hint in `DrawerScreen.kt` |
+| Settings backup / restore as one JSON file through the system file picker | `data/SettingsBackup.kt` (envelope `app`/`format`/`settings`, tested), rows in `SettingsRoot.kt` `AboutPage` |
 | Fast apps (≤5), corner shortcuts, home gestures, notices | `ui/home/HomeScreen.kt` |
 | Weekly review: alarm, home notice, notification, the week's summary | `service/WeeklyReview.kt`, `data/WeekSummary.kt`, `ui/review/ReviewScreen.kt` |
 | Setup page (default home, usage access, app locking, notifications, calendar) | `ui/settings/SetupPage.kt` |
@@ -79,6 +80,10 @@ ui/     theme/ components/ home/ drawer/ block/ review/ settings/   + Launching.
   language is one more `values-<qualifier>` folder and no code: see `TRANSLATING.md`.
 
 ## Quality bar
+7 emulator tests (`app/src/androidTest/.../e2e`, real app as home screen, UI Automator; run with
+`e2e/run-on-emulator.sh` or `/test-build`; `3-details/emulator-tests.md`). They find screens by
+`ui/TestTags.kt`: keep those tags when reworking the home pager, the search field or the wall.
+The timer service logs its decisions: `adb logcat -s FocusTimer` (connected, "wall in N s", wall).
 33 unit tests pass (tracker 13, emoji 6, settings 7, music linger 7; `org.json` is a test-only
 dependency because the JVM has none); `lintDebug` = 0 errors (remaining warnings are "newer
 version available", deliberate: newer AndroidX needs compileSdk 37 + AGP 9.1). 37 Kotlin files,
@@ -89,4 +94,4 @@ Release APK = 1,366,083 bytes (≈ 1.37 MB). Version **1.1** (`versionCode` 2) s
 ## Tier 3 pointers
 `usage-tracking.md` · `app-classification.md` · `timers-wall-consent.md` · `weekly-review.md` ·
 `home-drawer-menu-setup.md` · `ui-system.md` · `calendar.md` · `performance.md` ·
-`toolchain-and-build.md` · `mistakes-and-lessons.md`
+`toolchain-and-build.md` · `emulator-tests.md` · `mistakes-and-lessons.md`

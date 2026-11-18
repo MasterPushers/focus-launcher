@@ -22,6 +22,7 @@ enum class Tip(@StringRes val gestureRes: Int, @StringRes val resultRes: Int) {
     SWIPE_DOWN(R.string.tip_swipe_down, R.string.tip_swipe_down_result),
     CLOCK(R.string.tip_clock, R.string.tip_clock_result),
     SCREEN_TIME(R.string.tip_screen_time, R.string.tip_screen_time_result),
+    FAST_APPS(R.string.tip_fast_apps, R.string.tip_fast_apps_result),
     CORNERS(R.string.tip_corners, R.string.tip_corners_result),
     SECTIONS(R.string.tip_sections, R.string.tip_sections_result),
     /** Only shown while one of the two sections is on; see `HomeScreen`. */

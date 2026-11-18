@@ -49,6 +49,8 @@
     <!-- The small badge above a tip. %1$d is the tip's number, %2$d how many tips there are. -->
     <string name="home_tip_counter">TIP %1$d / %2$d</string>
     <string name="home_toast_double_tap_lock">Turn on the Focus timer service to lock with a double tap</string>
+    <!-- The clock's tap is set to open the alarms, and no app on the phone would open them. -->
+    <string name="home_toast_no_alarms">Could not open alarms</string>
 
     <!-- Fast apps: shown while none is pinned. Two lines. -->
     <string name="home_favorites_empty">Swipe left for your apps.\nLong-press one to pin it here.</string>

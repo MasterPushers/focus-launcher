@@ -205,3 +205,47 @@ Each entry: symptom → cause → fix / rule. Add to this whenever something cos
 - PSS is not comparable across process ages (95 MB fresh vs 44 MB settled). CPU in a window where
   someone is swiping measures them, not the app. `dumpsys gfxinfo`/`meminfo` themselves cost the
   app a few ms. → Measure with the screen off or during a confirmed quiet window; say which.
+
+## Emulator tests (UI Automator), 2026-11-11
+- **A `BySelector` changes in place.** Symptom: `doesNotShow(MAIL)` passed and the next
+  `open(GAME)` timed out although Dummy Game was on screen. Cause: `list.hasDescendant(x)` adds
+  `x` to the stored `list` selector and returns the same object, so every later lookup required
+  all earlier descendants. Fix: build a fresh selector per lookup (`private fun list() = By.res(…)`);
+  `e2e/check-test-rules.sh` now rejects `val … = By.…`.
+- **Section headings are drawn in capitals** ("WITH A DAILY LIMIT"), and UI Automator reports the
+  drawn text. Compare headings without case.
+- **The emulator keeps today's usage between runs.** Symptom: run 2 failed the fast-app and
+  search tests: the wall came up, "1h 7m today · limit 30m". Cause: earlier runs had used up
+  Dummy Game's automatic 30-minute game limit. Fix: tests that only need "an app that opens" use
+  Dummy Mail (never limited); timer tests set a limit relative to what was already used.
+- **Focus's search is typo-tolerant** (loose in-order match from three letters): "dummy m" also
+  lists "Dummy Game". A test that checks "not listed" has to use a query that cannot match
+  loosely ("dummy mail"); "first result" is the user-visible promise.
+- **UI Automator switches other accessibility services off** while it is connected unless
+  `Configurator.uiAutomationFlags = FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES` is set before the
+  first `UiDevice.getInstance` (`support/Device.kt`). Focus's mid-session test needs its service.
+- **Local emulator would not start**: "Broken AVD system path". The shell's `ANDROID_HOME` points
+  at the Homebrew SDK, which has no system images; the emulator follows `ANDROID_HOME` over
+  `ANDROID_SDK_ROOT`. Fix: set both to `~/Library/Android/sdk` for the emulator command.
+- **zsh: never name a variable `path`.** `IFS=: read path name ver` replaced `$PATH` (zsh ties
+  `path` to it) and every later command was "not found".
+- **A force-stopped app's accessibility service stays unbound although its setting still names
+  it.** Every `am instrument` force-stops Focus; a run that ended with the service on left the
+  next run unable to switch it on (writing the same setting value changes nothing, so Android
+  never rebinds). Fix: `Given.accessibilityService` always deletes the setting, waits for the
+  service to stop, then writes it; `Journey` switches it off after every test; the runner deletes
+  it before a run. The same holds on a phone after a force-stop from App info: the Setup page reads
+  the setting and would still say "on" (not changed; noted for the owner).
+- **Changing the home app restarts the home screen a few seconds later, even when it is set to
+  the app that already is home.** Symptom: the first test of a run (app-list search) failed now
+  and then: `MainActivity` destroyed and recreated mid-test, the search text gone,
+  `StaleObjectException`. Cause: `Environment` ran `cmd package set-home-activity` at the start
+  of every run. Fix: `e2e/run-on-emulator.sh` sets it only when Focus is not home yet and waits
+  until Focus stays in front; the tests only check it (`cmd package resolve-activity … HOME`).
+- **Ubuntu's package servers can be down for everyone** (2026-11-11: `archive.ubuntu.com` and
+  `security.ubuntu.com` did not resolve from GitHub's runners or from the owner's Mac; Docker Hub,
+  Google, Maven and Debian did). Symptom: "Temporary failure resolving", apt exit 100, in Build,
+  in the Test build container, and it would have hit Publish. It first looked like a container
+  network problem; `dig` from the Mac showed it was Ubuntu. Fix: the Test build container does
+  without apt; the site's `rsvg-convert` falls back to a Debian container (`site/need-rsvg.sh`).
+  Check the outside world (`dig`, another machine) before blaming the runner.

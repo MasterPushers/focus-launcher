@@ -62,6 +62,17 @@ updated: the owner was told to back both up. A `dist` APK cannot be installed ov
   to runs the owner approved, and only from `main`. The build workflow still never sees the key.
   It is switched on by the owner running `site/setup-ci-publishing.sh` once (**never run that
   script as an agent**: it handles his keys); until then the workflow skips itself.
+- **Emulator tests** (since 2026-11-11, owner's request): a maintainer writes `/test-build`
+  (optionally API levels) on a PR → `.github/workflows/test-build.yml` checks write access, builds
+  the PR **inside a sealed container** (PR code never runs on the runner: a comment workflow has
+  main's cache scope, which Publish reads), then runs `app/src/androidTest` on emulators with the
+  script from main, and comments the verdict with pictures, video and APK as artifacts. Only works
+  once the file is on `main`. Build checks the test-writing rules on every PR
+  (`e2e/check-test-rules.sh`). Details: `3-details/emulator-tests.md`.
+- **Site pictures need `rsvg-convert`** (Build and Publish): `site/need-rsvg.sh` installs it from
+  Ubuntu's servers, and when those fail (owner's wish after the 2026-11-11 outage) runs it from a
+  Debian container (`debian:stable-slim` + librsvg2-bin + DejaVu/Liberation fonts) through a
+  wrapper on PATH. No workflow step depends on Ubuntu's servers alone any more.
 - **Versions** are `<baseVersion>.<number of commits>`; the build number is the `versionCode`.
 - **Collaborators' pull requests** are reviewed before anything is built for the phone or the
   public download. Checklist and reasoning: `3-details/ci-and-releases.md`.
@@ -94,5 +105,5 @@ CI publishing is built but waits for the owner to run the setup script · the F-
 request waits for the owner's GitLab account and token.
 
 ## Tier 3 pointers
-`ci-and-releases.md` · `fdroid.md` · `signing-keys.md` · `toolchain-and-build.md` · `brain-upkeep.md` (the
+`ci-and-releases.md` · `emulator-tests.md` · `fdroid.md` · `signing-keys.md` · `toolchain-and-build.md` · `brain-upkeep.md` (the
 brain is part of the repo)

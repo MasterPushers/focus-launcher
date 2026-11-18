@@ -817,3 +817,80 @@ td, th, figcaption, h2, summary`, the facts and the footer outside `.phone`:
 **Lesson kept:** he stopped a tool call that was only waiting for CI. Do not block a turn on a
 CI run he did not ask to wait for; start what he asked for and check CI afterwards.
 
+## 2026-10-05 · Fast apps arranged by dragging on the home screen (a contributor, branch `fast-apps-drag`)
+
+**Asked:** "rearrange the 5 apps like I want, the 2nd app on 1st etc., like done in phones".
+Settings → Fast apps already had ↑ / ↓ arrows; he wanted it in place.
+**Done** (`HomeScreen.kt` only): hold a fast app → it lifts (haptic, 85% alpha) and follows the
+finger; it changes places with the neighbour whose middle it passes (`Settings.favorites`
+rewritten per swap); let go without moving → the app menu, as before; tap → launch, as before.
+`rowTops` via `onPlaced`, the lifted row drawn at `dragStartTop + dragOffset − currentTop` in
+`graphicsLayer` (no recomposition per move), moves consumed in the Initial pass so the tap does
+not fire on release. Branched from `main`.
+**Verified:** 51 unit tests, lint 0 errors, release build, installed for user 0.
+**Not verified:** the gesture itself on the device.
+Also a tip for it, `Tip.FAST_APPS` ("Hold a fast app → drag to reorder"), ticked off by the first
+real swap and skipped while fewer than two apps are pinned. Thirteen tips now.
+Then, from the phone: "when I am dragging and swipe left or right nothing should happen". A drag
+with a sideways wobble had opened the web search (the swipe-right watcher reads the Initial pass
+on the pager, above the row). → `homeDragging` (a module-level `mutableStateOf` in
+`HomeScreen.kt`): while a fast app is lifted the watcher stands down and the pager has
+`userScrollEnabled = false`. **Tested on the device by injected touches**, at his request
+(`input motionevent` DOWN / MOVE / UP, guarded by "Focus home in front and focused" before and
+after): a drag with ±220px sideways wobble moved only the app (IWGFS → IWFSG), nothing else
+opened; hold-and-release without moving opened the app menu; the original order was restored
+by two more drags and re-read stable. No crash. Reading the order: `uiautomator dump`, the five
+text nodes between the sections and the corners sorted by y; the user's app names were used for
+the comparison only and are not written anywhere.
+
+## 2026-11-04 · Settings backup and restore (a contributor, branch `settings-backup`)
+
+**Asked:** the wish in issue #31 ("a backup/restore system for all settings … also how apps are
+renamed"); build, test on an emulator, PR, merge.
+**Done:** `SettingsBackup` = the existing `settings_json` under an envelope (`app`, `format`,
+`settings`); `read` refuses anything else and goes through `Settings.fromJson`, so old files keep
+reading. About → "Settings file": Back up (`CreateDocument`, default name
+`focus-settings-<date>.json`) and Restore (`OpenDocument`); no permission, user picks the place.
+Left out on purpose: usage history and limit tallies. 4 unit tests (round trip, defaults, refusal,
+unknown keys).
+**Verified:** 37 unit tests, lint 0 errors; on the `sf35` emulator (Android 15, debug build):
+backup wrote a 1.4 KB file through the picker; a file edited to white theme / mono / a note
+restored through the picker and `shared_prefs` showed the new values (the emulator's default
+home is the stock launcher, so Focus's own screen was opened by intent: white theme, mono font
+and the restored note were all there).
+
+## 2026-11-11: Emulator tests and the maintainer-only /test-build command
+- Asked: run the app on emulators in CI, started only by a maintainer's `/test-build` comment,
+  with video and screenshots; then "real" end-to-end tests with an architecture that keeps them
+  correct and does not keep closing apps or hopping between screens. Shown as two diagrams first.
+- Done: `.github/workflows/test-build.yml` (authorize → container build → emulator matrix →
+  PR comment), `e2e/` (README with the rules, `run-on-emulator.sh`, `check-test-rules.sh`,
+  `fixtures/` as a separate Gradle build), 7 journeys + robots + support under
+  `app/src/androidTest/.../e2e`, `ui/TestTags.kt` and four test tags in the app, AndroidX test
+  libraries (test APK only), a rules step in `build.yml`. Details: `3-details/emulator-tests.md`.
+- Verified (local Pixel API 36 emulator, arm64): unit tests and lint (0 errors) pass; the suite
+  passes; each of the 7 tests failed on a deliberate break of its feature and passed again after;
+  `check-test-rules.sh` fails on planted violations; actionlint and shellcheck clean (info only).
+  Runs 1–3 found test bugs, not app bugs (stored selectors, capitalised headings, usage carried
+  over between runs, typo-tolerant search); lessons in `mistakes-and-lessons.md`.
+- The owner ruled out flaky tests ("keep chasing it"). Repeated runs found two setup races
+  (unbound service after a force-stop, home-screen restart), both fixed; one service-test failure
+  stays unexplained, no repeat in the 25 runs since (`3-details/emulator-tests.md`). Added
+  `FocusTimer` log lines to the service and `dumpsys accessibility` to the failure evidence.
+- Pushed to `main` at the owner's request ("push the code change on the main directly"), from a
+  worktree of `origin/main` (14 commits ahead of this checkout: fast-app dragging, settings
+  backup, action bumps): only this work's files, action pins matched to main's, then build, unit
+  tests, lint and one full emulator run on that code (7/7). The push touches the app, so Publish
+  starts and waits for the owner's approval; approving it releases these changes.
+- Not verified: anything on GitHub's emulators (first real `/test-build` still to come), Android
+  8.0 (API 26), x86_64 images, the container build on a runner. Open PRs from before this
+  (#52, #42, #41, #40, #25) need `main` merged in before `/test-build` can test them.
+- 2026-11-11 (follow-up, after the push): the first GitHub runs failed: Ubuntu's package servers
+  were unreachable (from GitHub and from the Mac), which broke the Test build container (apt for
+  git) and Build's site step (apt for rsvg-convert). Fixed on a temporary branch, tried there with
+  manual runs, then pushed to `main` at the owner's word ("yes push on the main"): no apt in the
+  container; `site/need-rsvg.sh` with a Debian-container fallback (owner: "use debian base image
+  as backup"). Verified on GitHub: Test build on the branch passed fully, 7/7 on Android 8.0 and
+  16. Build on the branch (run 43058725217) took the Debian route while Ubuntu was still down
+  ("rsvg-convert version 2.60.0") and passed.
+

@@ -11,6 +11,8 @@ is up, and once a week it shows you the week you actually had.
 
 **[Website](https://how2me.me/focusapp/)** · **[Download the APK](https://github.com/patelchaitany/focus-launcher/releases/latest)** (1.3 MB, Android 8.0+) · **[All releases](https://github.com/patelchaitany/focus-launcher/releases)** · free software (GPL-3.0-or-later) · no ads, no account, **no internet permission**
 
+<p align="center"><a href="https://buymeacoffee.com/MasterPushers"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy me a coffee" width="178" height="50"></a></p>
+
 [![Build](https://github.com/patelchaitany/focus-launcher/actions/workflows/build.yml/badge.svg)](https://github.com/patelchaitany/focus-launcher/actions/workflows/build.yml)
 
 Built with Kotlin and Jetpack Compose, without the Material library, in about 6,500 lines.
@@ -87,6 +89,11 @@ Built with Kotlin and Jetpack Compose, without the Material library, in about 6,
   right: search the web", "Long-press the clock: choose what a tap on it opens", …), and each goes
   away as soon as you have done it, or when you tap it. Settings → About brings them back. There is
   no splash on later starts: a launcher is opened too often to put anything in front of it.
+
+**Backup**
+- Settings → About → Back up settings writes every setting (layout, sections, gestures, fast apps,
+  renames, hidden apps, timers, theme) to one small JSON file where you choose; Restore settings
+  reads one back. Screen-time history is not part of it.
 
 ## How apps are sorted into "social", "game" and the rest
 

@@ -28,6 +28,8 @@
 | After "ignore limit for today", **ask consent on every open** | `askAfterBypass`, default on; one yes covers one visit |
 | App launch must feel instant | Ring-tap launches were reported slow; the cause was my clip-reveal animation |
 | Small memory, low CPU | Measured and optimized; see `3-details/performance.md` |
+| **Emulator tests on request, maintainers only** (2026-11-11): "only the maintainer can run this thing … paste the slash test-build command then it build and test the app", with video and screenshots | `/test-build` on a PR (`3-details/emulator-tests.md`). Anyone without write access gets nothing. Default Android 8.0 + 16 |
+| **Real end-to-end tests, with an architecture that keeps them correct** (2026-11-11): no "closing and opening app or moving between screens too much" | Journeys → robots → support; the app starts once per run, state reset in place; ≤3–4 screen changes per test; each test seen failing on a deliberate break; repeated runs before merging (`e2e/README.md`). **"We don't want flaky test, keep chasing it"** (2026-11-11): a test that fails only sometimes is fixed at the cause, never retried, quarantined or loosened to pass |
 | Site headline is his wording | "Reclaim your time. Spend it touching some grass." Never change it |
 | Site: black and white, hosted at how2me.me/focusapp, APK download | Done |
 | Wants to be found for "minimalist launcher" searches | On-page + technical SEO done; never promise rankings |

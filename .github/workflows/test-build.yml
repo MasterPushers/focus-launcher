@@ -1,0 +1,321 @@
+name: Test build
+
+# A maintainer writes /test-build in a comment on a pull request. Focus is then built from that
+# pull request, its unit tests run, and its emulator tests (app/src/androidTest, e2e/README.md) run
+# on Android emulators: the real app as the home screen, driven like a person would, next to two
+# small apps of our own (e2e/fixtures). A picture of every checkpoint, a video of the whole run,
+# the log and the APK are attached to the run, and the result is posted on the pull request.
+#
+#   /test-build              Android 8.0 (API 26, the oldest Focus supports) and 16 (API 36)
+#   /test-build 30 34 36     these API levels instead (26 to 36, at most four)
+#
+# Only people with write access to this repository can start it; anybody else's /test-build does
+# nothing. It also runs by hand: Actions -> Test build -> Run workflow (with a pull request number,
+# or without one for the chosen branch). GitHub runs comment workflows from main only, so a change
+# to this file takes effect once it is merged.
+#
+# Why the build runs in a container. A comment workflow runs with the trust of main, not of the
+# pull request: what it writes to GitHub's cache is read later by builds on main, the one that
+# signs releases among them. A pull request's Gradle files are code. So the pull request is built
+# inside a Docker container that gets a copy of the source, a copy of the SDK and nothing else: no
+# token, no cache, no access to the runner. Outside the container only this repository's own steps
+# run, the script that drives the emulator comes from main, and the pull request's tests and APKs
+# run inside the emulator. Even so, read the diff before you write /test-build: it is your word
+# that the code may run.
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Pull request number. Empty = the branch chosen above."
+        required: false
+        default: ""
+      apis:
+        description: "Android API levels, separated by spaces (26 to 36, at most four)"
+        required: false
+        default: "26 36"
+
+permissions: {}
+
+jobs:
+  authorize:
+    name: Who asked, and which commit
+    # Every comment on the repository starts this workflow; only /test-build on a pull request goes on.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.pull_request && startsWith(github.event.comment.body, '/test-build'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: write   # the reaction on the comment
+    outputs:
+      allowed: ${{ steps.check.outputs.allowed }}
+      sha: ${{ steps.check.outputs.sha }}
+      pr: ${{ steps.check.outputs.pr }}
+      apis: ${{ steps.check.outputs.apis }}
+    steps:
+      - name: Check the access of whoever asked, read the command
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          ACTOR: ${{ github.event.comment.user.login || github.triggering_actor }}
+          BODY: ${{ github.event.comment.body }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          ISSUE: ${{ github.event.issue.number }}
+          INPUT_PR: ${{ inputs.pr }}
+          INPUT_APIS: ${{ inputs.apis }}
+          BRANCH_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          set -f   # the command's words are never file patterns
+          react() { if [ -n "$COMMENT_ID" ]; then gh api -X POST "repos/$REPO/issues/comments/$COMMENT_ID/reactions" -f content="$1" >/dev/null || true; fi; }
+
+          # admin, write (maintain counts as write), read or none
+          perm=$(gh api "repos/$REPO/collaborators/$ACTOR/permission" --jq .permission 2>/dev/null || echo none)
+          if [ "$perm" != admin ] && [ "$perm" != write ]; then
+            echo "$ACTOR has '$perm' access; only people with write access can start a test build. Nothing runs."
+            exit 0
+          fi
+
+          if [ "$EVENT" = issue_comment ]; then
+            line=$(printf '%s\n' "$BODY" | head -n1 | tr -d '\r')
+            if [[ ! "$line" =~ ^/test-build([[:space:]]+(.*))?$ ]]; then
+              echo "Not a /test-build command. Nothing runs."
+              exit 0
+            fi
+            wanted="${BASH_REMATCH[2]:-}"
+            pr="$ISSUE"
+          else
+            wanted="$INPUT_APIS"
+            pr="$INPUT_PR"
+          fi
+          [ -n "${wanted// /}" ] || wanted="26 36"
+
+          apis=()
+          for a in $wanted; do
+            if [[ ! "$a" =~ ^[0-9]{2}$ ]] || [ "$a" -lt 26 ] || [ "$a" -gt 36 ]; then
+              react confused; echo "::error::'$a' is not an Android API level from 26 to 36"; exit 1
+            fi
+            [[ " ${apis[*]-} " == *" $a "* ]] || apis+=("$a")
+          done
+          if [ "${#apis[@]}" -gt 4 ]; then react confused; echo "::error::at most four API levels per run"; exit 1; fi
+
+          if [ -n "$pr" ]; then
+            [[ "$pr" =~ ^[0-9]+$ ]] || { echo "::error::'$pr' is not a pull request number"; exit 1; }
+            read -r state sha < <(gh api "repos/$REPO/pulls/$pr" --jq '"\(.state) \(.head.sha)"')
+            if [ "$state" != open ]; then react confused; echo "::error::pull request #$pr is $state"; exit 1; fi
+          else
+            sha="$BRANCH_SHA"
+          fi
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::no commit to test"; exit 1; }
+
+          react eyes
+          json=$(printf '%s\n' "${apis[@]}" | jq -cs 'map(tonumber)')
+          { echo "allowed=true"; echo "sha=$sha"; echo "pr=$pr"; echo "apis=$json"; } >> "$GITHUB_OUTPUT"
+          echo "### Test build of \`${sha::7}\`${pr:+ (pull request #$pr)}, asked for by $ACTOR, on API ${apis[*]}" >> "$GITHUB_STEP_SUMMARY"
+          echo "testing $sha${pr:+ of #$pr} on API ${apis[*]}"
+
+  build:
+    name: Build and unit-test it (in a container)
+    needs: authorize
+    if: needs.authorize.outputs.allowed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the commit to test
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.authorize.outputs.sha }}
+          path: checkout
+          fetch-depth: 0             # the build number in the version is the number of commits
+          persist-credentials: false
+
+      # The container works on copies. The checkout itself stays untouched, because the runner
+      # runs git in it once more when the job ends.
+      - name: Copies of the source and the SDK for the container
+        run: |
+          set -euo pipefail
+          cp -a checkout "$RUNNER_TEMP/src"
+          sdk="$RUNNER_TEMP/sdk"
+          mkdir -p "$sdk/platforms" "$sdk/build-tools"
+          cp -a "$ANDROID_HOME/licenses" "$sdk/"
+          # What the project compiles against, when the runner has it. Anything else the build
+          # downloads by itself, into the copy.
+          compile=$(sed -n 's/^[[:space:]]*compileSdk[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' checkout/app/build.gradle.kts | head -1)
+          if [ -n "$compile" ] && [ -d "$ANDROID_HOME/platforms/android-$compile" ]; then
+            cp -a "$ANDROID_HOME/platforms/android-$compile" "$sdk/platforms/"
+          fi
+          for tools in "$ANDROID_HOME"/build-tools/3[5-9].*; do
+            if [ -d "$tools" ]; then cp -a "$tools" "$sdk/build-tools/"; fi
+          done
+          du -sh "$RUNNER_TEMP/src" "$sdk"
+
+      # The image has no git, so the build number is unknown and the test APK reads "1.1". Installing
+      # git from Ubuntu's servers made every run depend on them (unreachable on 2026-11-11).
+      - name: Build the debug APK and run the unit tests, inside the container
+        env:
+          IMAGE: eclipse-temurin:21-jdk
+        run: |
+          set -uo pipefail
+          tasks=":app:testDebugUnitTest :app:assembleDebug"
+          # The emulator tests and their two fixture apps (a pull request from before they existed has neither).
+          if [ -d checkout/app/src/androidTest ]; then tasks="$tasks :app:assembleDebugAndroidTest"; fi
+          fixtures=""
+          if [ -f checkout/e2e/fixtures/settings.gradle.kts ]; then fixtures=yes; fi
+          status=0
+          docker run --rm \
+            -v "$RUNNER_TEMP/src:/src" -w /src \
+            -v "$RUNNER_TEMP/sdk:/sdk" -e ANDROID_HOME=/sdk -e ANDROID_SDK_ROOT=/sdk \
+            -e TASKS="$tasks" -e FIXTURES="$fixtures" \
+            "$IMAGE" bash -c '
+              set -e
+              ./gradlew --no-daemon $TASKS
+              if [ -n "$FIXTURES" ]; then ./gradlew --no-daemon -p e2e/fixtures assembleDebug; fi' || status=$?
+          sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/src" "$RUNNER_TEMP/sdk"
+          exit $status
+
+      # Only plain files that really are inside the build's copy leave it: a link planted by the
+      # build could otherwise point at a file of the runner and have it uploaded.
+      - name: Take the APKs out
+        id: apk
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/src"
+          mkdir -p out
+          take() { # <path in the project> <required|optional>
+            local f="$src/$1" real
+            if [ ! -e "$f" ]; then
+              if [ "$2" = required ]; then echo "::error::$1 was not built"; exit 1; fi
+              return 0
+            fi
+            real=$(realpath "$f")
+            case "$real" in "$src/"*) ;; *) echo "::error::$1 points outside the build"; exit 1 ;; esac
+            [ -f "$real" ] || { echo "::error::$1 is not a file"; exit 1; }
+            cp "$real" out/
+          }
+          take app/build/outputs/apk/debug/app-debug.apk required
+          take app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk optional
+          take e2e/fixtures/game/build/outputs/apk/debug/game-debug.apk optional
+          take e2e/fixtures/post/build/outputs/apk/debug/post-debug.apk optional
+          aapt2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
+          badging=$("$aapt2" dump badging out/app-debug.apk)
+          grep -q "^package: name='com.focus.launcher'" <<<"$badging" || { echo "::error::app-debug.apk is not Focus"; exit 1; }
+          version=$(sed -n "s/.*versionName='\([^']*\)'.*/\1/p" <<<"$badging" | head -1)
+          ls -l out
+          echo "- Built Focus $version (debug), $(stat -c %s out/app-debug.apk) bytes; unit tests passed" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: apk
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Keep the test reports when something fails
+        if: failure()
+        run: |
+          mkdir -p reports
+          for d in reports test-results; do
+            if [ -d "$RUNNER_TEMP/src/app/build/$d" ]; then cp -r "$RUNNER_TEMP/src/app/build/$d" reports/; fi
+          done
+          find reports -type l -delete   # links stay behind, see above
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: build-reports
+          path: reports/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  emulator:
+    name: Android API ${{ matrix.api }} on an emulator
+    needs: [authorize, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        api: ${{ fromJSON(needs.authorize.outputs.apis) }}
+    steps:
+      # The script that drives the emulator comes from main (or the branch a maintainer chose by
+      # hand), never from the pull request.
+      - name: The emulator script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: e2e
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: apk
+          path: apk
+
+      # The runners can use hardware virtualization; without this the emulator takes forever.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the emulator tests, with pictures and a video
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash e2e/run-on-emulator.sh apk results
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: android-api-${{ matrix.api }}
+          path: results/
+          if-no-files-found: warn
+          retention-days: 14
+
+  report:
+    name: Post the result
+    needs: [authorize, build, emulator]
+    if: always() && needs.authorize.outputs.allowed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write          # a comment on a pull request is an issue comment
+      pull-requests: write
+    steps:
+      - name: Comment on the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ needs.authorize.outputs.pr }}
+          SHA: ${{ needs.authorize.outputs.sha }}
+          APIS: ${{ needs.authorize.outputs.apis }}
+          BUILD: ${{ needs.build.result }}
+          EMULATOR: ${{ needs.emulator.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          android=$(jq -r 'map({"26":"8.0","27":"8.1","28":"9","29":"10","30":"11","31":"12","32":"12L","33":"13","34":"14","35":"15","36":"16"}[tostring] as $v | "Android \($v) (API \(.))") | join(", ")' <<<"$APIS")
+          if [ "$BUILD" = success ] && [ "$EMULATOR" = success ]; then verdict="passed"; else verdict="failed"; fi
+          body=$(printf '%s\n' \
+            "**Test build $verdict** for \`${SHA::7}\` on $android" \
+            "" \
+            "- Build and unit tests: $BUILD" \
+            "- Emulator tests: $EMULATOR" \
+            "- Screenshots, video, log and the APK: [the run]($RUN_URL), under Artifacts")
+          printf '%s\n' "$body" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$PR" ]; then gh api "repos/$REPO/issues/$PR/comments" -f body="$body" >/dev/null; fi

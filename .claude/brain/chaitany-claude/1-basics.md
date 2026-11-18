@@ -16,7 +16,8 @@ device or what is on his phone lives only in the git-ignored `private/` folder n
 
 ## Rules that prevent damage
 1. **The phone is in use while you test.** Never inject blind taps or swipes. Open screens by
-   intent; screenshot only when `topResumedActivity` is `com.focus.launcher/`.
+   intent; screenshot only when `topResumedActivity` is `com.focus.launcher/`. The emulator tests
+   never touch it: `e2e/run-on-emulator.sh` only, never `connectedDebugAndroidTest`.
 2. **Never grant special access over adb** (usage access, accessibility, notification access,
    default home). The in-app Setup page sends the owner to each switch.
 3. **The repo is public.** Before every push, run the audit in `2-overview/github-and-release.md`.
@@ -41,6 +42,7 @@ device or what is on his phone lives only in the git-ignored `private/` folder n
 | --- | --- |
 | App source | `app/src/main/java/com/focus/launcher/` (`data/`, `service/`, `ui/`) |
 | Unit tests | `app/src/test/…/` `data/` (tracker 13, emoji 6, settings 7) · `ui/home/` (music linger 7) |
+| Emulator tests · `/test-build` | `app/src/androidTest/…/e2e/` + `e2e/` (README, fixtures, runner) · `3-details/emulator-tests.md` |
 | Website source / output | `site/src/` → `site/public/` (generated, ignored) |
 | nginx rules for the site | `site/nginx-focusapp.conf` (installed on the server as a snippet) |
 | Signing key / its password | outside the repo / both named in `keystore.properties` (ignored) |

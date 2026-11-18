@@ -50,6 +50,8 @@
     <string name="tip_clock_result">ustaw, co otwiera</string>
     <string name="tip_screen_time">Kliknij czas przed ekranem</string>
     <string name="tip_screen_time_result">twój dzień</string>
+    <string name="tip_fast_apps">Przytrzymaj szybką aplikację</string>
+    <string name="tip_fast_apps_result">przestaw ją</string>
     <string name="tip_corners">Przytrzymaj dolny róg</string>
     <string name="tip_corners_result">zmień skrót</string>
     <string name="tip_sections">Kliknij tutaj</string>
