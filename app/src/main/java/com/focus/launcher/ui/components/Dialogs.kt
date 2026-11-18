@@ -182,15 +182,24 @@ fun TextInputDialog(
     numeric: Boolean = false,
     /** Several lines: Enter makes a new line, "Save" is the only way to confirm. */
     multiline: Boolean = false,
+    /**
+     * A tap beside the dialog or Back, with changes typed, asks "Keep your changes?" instead of
+     * dropping them (issue 30: a note was lost to one stray tap). Cancel still discards at once.
+     */
+    askBeforeDiscarding: Boolean = multiline,
     onConfirm: (String) -> Unit,
 ) {
-    var value by remember { mutableStateOf(TextFieldValue(initial, TextRange(0, initial.length))) }
+    // One line is usually replaced as a whole (a name, a number), so it starts selected. Several
+    // lines are added to: the cursor waits at the end, and the first key does not wipe the text.
+    var value by remember { mutableStateOf(TextFieldValue(initial, if (multiline) TextRange(initial.length) else TextRange(0, initial.length))) }
+    var askingToKeep by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
     val submit = {
         onConfirm(value.text.trim())
         onDismiss()
     }
-    FocusDialog(onDismiss, title, subtitle) {
+    val dismissRequest = { if (askBeforeDiscarding && value.text.trim() != initial.trim()) askingToKeep = true else onDismiss() }
+    FocusDialog(dismissRequest, title, subtitle) {
         UnderlinedField(
             value = value,
             onValueChange = { next -> value = if (numeric) next.copy(text = next.text.filter(Char::isDigit).take(4)) else next },
@@ -202,6 +211,17 @@ fun TextInputDialog(
             singleLine = !multiline,
         )
         DialogButtons(onDismiss, confirmLabel, onConfirm = submit)
+    }
+    if (askingToKeep) {
+        // Back or a tap beside this one returns to the text, still unsaved.
+        FocusDialog({ askingToKeep = false }, title = "Keep your changes?") {
+            T(
+                "What you typed is not saved yet.",
+                Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                size = 15.sp, color = LocalFocusColors.current.dim, lineHeight = 21.sp,
+            )
+            DialogButtons(onDismiss, confirmLabel, cancelLabel = "Discard", onConfirm = submit)
+        }
     }
     LaunchedEffect(Unit) { focus.requestFocus() }
 }

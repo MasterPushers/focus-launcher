@@ -625,6 +625,39 @@ private fun MediaController.read(): NowPlaying {
     return NowPlaying(this, data.title(), data.artist(), playing = false, duration = data.duration()).withState(playbackState)
 }
 
+/** A button of the music section: the key a headset would send, and the command it stands for. */
+internal enum class PlayerKey(val code: Int, val action: Long) {
+    PREVIOUS(KeyEvent.KEYCODE_MEDIA_PREVIOUS, PlaybackState.ACTION_SKIP_TO_PREVIOUS),
+    PLAY(KeyEvent.KEYCODE_MEDIA_PLAY, PlaybackState.ACTION_PLAY),
+    PAUSE(KeyEvent.KEYCODE_MEDIA_PAUSE, PlaybackState.ACTION_PAUSE),
+    NEXT(KeyEvent.KEYCODE_MEDIA_NEXT, PlaybackState.ACTION_SKIP_TO_NEXT),
+}
+
+/**
+ * Presses [key] on this player; false when the player could not be reached. The press goes to the
+ * player as a media button, the way a headset's button does, because that is the one way in that
+ * every player answers (issue 21). Commands through transportControls look the same but some
+ * players drop them: MA Music (Media3) ignored all four from Focus, on a test device, while it
+ * obeyed the same presses as media buttons; older players listen only for buttons. A player that
+ * lists no actions at all can only be told through its callbacks, so it still gets the command.
+ */
+internal fun MediaController.press(key: PlayerKey): Boolean {
+    val actions = playbackState?.actions ?: 0L
+    if (actions == 0L) {
+        val controls = transportControls
+        when (key) {
+            PlayerKey.PREVIOUS -> controls.skipToPrevious()
+            PlayerKey.PLAY -> controls.play()
+            PlayerKey.PAUSE -> controls.pause()
+            PlayerKey.NEXT -> controls.skipToNext()
+        }
+        return true
+    }
+    // Play and pause each have a key of their own; a player that lists only "play or pause" gets that one.
+    val code = if ((key == PlayerKey.PLAY || key == PlayerKey.PAUSE) && actions and key.action == 0L) KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE else key.code
+    return dispatchMediaButtonEvent(KeyEvent(KeyEvent.ACTION_DOWN, code)) && dispatchMediaButtonEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+}
+
 /** "1:05", "1:02:40". */
 private fun clock(ms: Long): String {
     val s = ms / 1000
@@ -677,7 +710,7 @@ internal fun MusicSection(state: MusicState, onOpenDefault: () -> Unit, onChoose
         audio?.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
         audio?.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
     }
-    val controls = now?.controller?.transportControls
+    val controller = now?.controller
 
     val open = { now?.let { openPlayer(context, it.controller) } ?: onOpenDefault() }
     Column(modifier.fillMaxWidth().press(onLongClick = onChoose, onClick = open).padding(horizontal = 12.dp, vertical = 6.dp)) {
@@ -688,11 +721,16 @@ internal fun MusicSection(state: MusicState, onOpenDefault: () -> Unit, onChoose
             // the finger was. The row is pulled right by the last square's margin, so the "next"
             // sign itself ends where the lines end.
             Row(Modifier.offset(x = 17.dp)) {
-                MediaButton(Glyph.PREVIOUS, 14.dp, c.dim) { controls?.skipToPrevious() ?: key(KeyEvent.KEYCODE_MEDIA_PREVIOUS) }
-                MediaButton(if (playing) Glyph.PAUSE else Glyph.PLAY, 17.dp, c.fg) {
-                    if (controls == null) key(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) else if (playing) controls.pause() else controls.play()
+                MediaButton(Glyph.PREVIOUS, 14.dp, c.dim) {
+                    if (controller == null || !controller.press(PlayerKey.PREVIOUS)) key(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
                 }
-                MediaButton(Glyph.NEXT, 14.dp, c.dim) { controls?.skipToNext() ?: key(KeyEvent.KEYCODE_MEDIA_NEXT) }
+                MediaButton(if (playing) Glyph.PAUSE else Glyph.PLAY, 17.dp, c.fg) {
+                    val wanted = if (playing) PlayerKey.PAUSE else PlayerKey.PLAY
+                    if (controller == null || !controller.press(wanted)) key(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                }
+                MediaButton(Glyph.NEXT, 14.dp, c.dim) {
+                    if (controller == null || !controller.press(PlayerKey.NEXT)) key(KeyEvent.KEYCODE_MEDIA_NEXT)
+                }
             }
         }
         when {

@@ -5,6 +5,7 @@ import android.app.ActivityOptions
 import android.app.SearchManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
@@ -106,11 +107,29 @@ fun openWebSearch(context: Context) {
     val candidates = buildList {
         add(Intent(SearchManager.INTENT_ACTION_GLOBAL_SEARCH).setPackage("com.google.android.googlequicksearchbox"))
         add(Intent(SearchManager.INTENT_ACTION_GLOBAL_SEARCH))
+        firefoxSearch(context)?.let(::add)
         add(Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, ""))
         add(Intent(Intent.ACTION_VIEW, "https://www.google.com/".toUri()))
     }
     val ok = Perms.start(context, *candidates.toTypedArray(), options = launchOptions(context))
     if (!ok) Toast.makeText(context, "No search app found", Toast.LENGTH_SHORT).show()
+}
+
+/**
+ * Firefox and its forks take a web search with no words by opening on their home page, with the
+ * keyboard down (issue 33). Their own "new tab" intent, the one their launcher shortcut sends,
+ * opens the search field with the keyboard up. Used when the browser that would take the web
+ * search is one of them, whatever its package (Firefox, Beta, Nightly, Fennec, IronFox, …).
+ */
+private fun firefoxSearch(context: Context): Intent? {
+    val pm = context.packageManager
+    fun handler(intent: Intent) = pm.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
+    // "android" is the chooser: no default for web searches, so the default browser decides.
+    val browser = handler(Intent(Intent.ACTION_WEB_SEARCH)).takeUnless { it == null || it == "android" }
+        ?: handler(Intent(Intent.ACTION_VIEW, "https://".toUri()))
+        ?: return null
+    return Intent("org.mozilla.fenix.OPEN_TAB").setClassName(browser, "org.mozilla.fenix.IntentReceiverActivity")
+        .takeIf { it.resolveActivity(pm) != null }
 }
 
 /** Opens [entry] right now, no questions asked. Used once the gate (or the wall) has said yes. */

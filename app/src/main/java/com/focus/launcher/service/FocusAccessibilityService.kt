@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import com.focus.launcher.BlockActivity
 import com.focus.launcher.Graph
 import com.focus.launcher.data.AppLimit
+import com.focus.launcher.data.CustomTabCredit
 import com.focus.launcher.util.formatMinutes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,6 +38,7 @@ class FocusAccessibilityService : AccessibilityService() {
 
     private val main = Handler(Looper.getMainLooper())
     private val activityCache = LruCache<String, Boolean>(256)
+    private val tabs = CustomTabCredit { Graph.apps.isHomeApp(it) || it == packageName }
 
     private var currentPkg: String? = null
     private var sessionStart = 0L
@@ -83,8 +85,11 @@ class FocusAccessibilityService : AccessibilityService() {
         if (Graph.limits.sessionConsent != null && cls != BlockActivity::class.java.name && Graph.apps.isHomeApp(pkg)) {
             Graph.limits.sessionConsent = null
         }
-        if (pkg == currentPkg) return
-        currentPkg = pkg
+        // A browser's Custom Tab belongs to the app that opened it (issue 51): its time counts for
+        // that app, so that app's timer keeps running instead of the browser's.
+        val front = tabs.resumed(pkg, cls, System.currentTimeMillis())
+        if (front == currentPkg) return
+        currentPkg = front
         sessionStart = System.currentTimeMillis()
         generation++
         evaluate()

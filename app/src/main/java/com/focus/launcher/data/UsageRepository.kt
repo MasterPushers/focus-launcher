@@ -55,7 +55,8 @@ class DayUsage(
 
         /** Bump whenever the way usage is computed changes, so days cached the old way are redone. */
         // 3: time in the Settings app is no longer mistaken for time on a home screen.
-        const val CACHE_VERSION = 3
+        // 4: time in a browser's Custom Tab goes to the app that opened it (CustomTabCredit).
+        const val CACHE_VERSION = 4
 
         fun empty(date: LocalDate) = DayUsage(date, emptyMap(), 0)
 
@@ -210,10 +211,11 @@ class UsageRepository(private val context: Context, private val apps: () -> AppR
             return null
         } ?: return null
         val e = UsageEvents.Event()
+        val tabs = customTabCredit()
         var last: String? = null
         while (events.hasNextEvent()) {
             events.getNextEvent(e)
-            if (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED) last = e.packageName
+            if (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED) last = tabs.resumed(e.packageName, e.className, e.timeStamp)
         }
         return last
     }
@@ -246,13 +248,18 @@ class UsageRepository(private val context: Context, private val apps: () -> AppR
         return set
     }
 
-    /** Feeds one system event to [tracker]; returns true when it was an unlock. */
-    private fun dispatch(e: UsageEvents.Event, tracker: ForegroundTracker): Boolean {
+    private fun customTabCredit(): CustomTabCredit {
+        val ignored = ignoredPackages()
+        return CustomTabCredit { it in ignored }
+    }
+
+    /** Feeds one system event to [tracker], through [tabs]; returns true when it was an unlock. */
+    private fun dispatch(e: UsageEvents.Event, tracker: ForegroundTracker, tabs: CustomTabCredit): Boolean {
         val pkg = e.packageName ?: return false
         val ts = e.timeStamp
         when (e.eventType) {
-            UsageEvents.Event.ACTIVITY_RESUMED -> tracker.resumed(pkg, ts)
-            UsageEvents.Event.ACTIVITY_PAUSED -> tracker.paused(pkg, ts)
+            UsageEvents.Event.ACTIVITY_RESUMED -> tracker.resumed(tabs.resumed(pkg, e.className, ts), ts)
+            UsageEvents.Event.ACTIVITY_PAUSED -> tracker.paused(tabs.paused(pkg, e.className), ts)
             UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.DEVICE_SHUTDOWN -> tracker.screenOff(ts)
             UsageEvents.Event.KEYGUARD_HIDDEN -> {
                 tracker.tick(ts)
@@ -277,6 +284,7 @@ class UsageRepository(private val context: Context, private val apps: () -> AppR
         private var unlocks = 0
         private val event = UsageEvents.Event()
         private val tracker = ForegroundTracker(COVER_GRACE_MS) { pkg, start, end -> if (add(hours, pkg, start, end)) version++ }
+        private val tabs = customTabCredit()
 
         /** Everything before this instant has been read. Starts early so a session that straddles midnight is seen whole. */
         var consumedUntil = dayStart - LOOKBACK_MS
@@ -297,7 +305,7 @@ class UsageRepository(private val context: Context, private val apps: () -> AppR
             } ?: return
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
-                if (dispatch(event, tracker) && event.timeStamp in dayStart until dayEnd) {
+                if (dispatch(event, tracker, tabs) && event.timeStamp in dayStart until dayEnd) {
                     unlocks++
                     version++
                 }
@@ -368,10 +376,11 @@ class UsageRepository(private val context: Context, private val apps: () -> AppR
         }
 
         val tracker = ForegroundTracker(COVER_GRACE_MS, ::add)
+        val tabs = customTabCredit()
         val e = UsageEvents.Event()
         while (events.hasNextEvent()) {
             events.getNextEvent(e)
-            if (dispatch(e, tracker) && e.timeStamp >= rangeStart) {
+            if (dispatch(e, tracker, tabs) && e.timeStamp >= rangeStart) {
                 val day = Instant.ofEpochMilli(e.timeStamp).atZone(zone).toLocalDate()
                 unlocks[day] = (unlocks[day] ?: 0) + 1
             }

@@ -148,9 +148,10 @@ fun DrawerScreen(
         }
     }
     // Search ignores tab and sort: it looks through both profiles and ranks by match.
-    val results = remember(visible, sorted, query, searchNames) {
-        if (query.isBlank()) sorted else searchApps(visible, query, searchNames)
+    val ranked = remember(visible, query, searchNames) {
+        if (query.isBlank()) emptyList() else rankApps(visible, query, searchNames)
     }
+    val results = remember(ranked, sorted, query) { if (query.isBlank()) sorted else ranked.map { it.second } }
     val recent = remember(inProfile, settings.showRecentInstalls) {
         if (!settings.showRecentInstalls) emptyList()
         else {
@@ -182,9 +183,9 @@ fun DrawerScreen(
     }
     // stats is a key too: when it arrives the list reorders, and a keyed list would follow the old top row.
     LaunchedEffect(query, workTab, sort, stats) { listState.scrollToItem(0) }
-    // Optional: open the app as soon as the search narrows down to exactly one.
-    LaunchedEffect(results, query) {
-        if (settings.autoLaunch && isActive && query.trim().length >= 2 && results.size == 1) onLaunch(results[0])
+    // Optional: open the app as soon as the search narrows down to exactly one (by name; see soleMatch).
+    LaunchedEffect(ranked, query) {
+        if (settings.autoLaunch && isActive && query.trim().length >= 2) soleMatch(ranked)?.let(onLaunch)
     }
 
     Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
@@ -409,24 +410,48 @@ private fun normalize(text: String): String {
  * name starts with it, then it appears anywhere, then initials ("gm" finds Google Maps), and
  * finally a loose in-order match for typos of three letters or more.
  */
-fun searchApps(apps: List<AppEntry>, query: String, names: Map<String, String> = emptyMap()): List<AppEntry> {
-    val q = normalize(query)
-    if (q.isEmpty()) return apps
-    val ranked = ArrayList<Pair<Int, AppEntry>>()
-    for (app in apps) {
-        val name = names[app.key] ?: normalize(app.label)
+fun searchApps(apps: List<AppEntry>, query: String, names: Map<String, String> = emptyMap()): List<AppEntry> =
+    if (normalize(query).isEmpty()) apps else rankApps(apps, query, names).map { it.second }
+
+/** [searchApps] with each app's rank ([RANK_START] … [RANK_LOOSE]), best first. */
+fun rankApps(apps: List<AppEntry>, query: String, names: Map<String, String> = emptyMap()): List<Pair<Int, AppEntry>> =
+    rankMatches(apps, normalize(query)) { app -> names[app.key] ?: normalize(app.label) }
+
+const val RANK_START = 0
+const val RANK_WORD = 1
+const val RANK_INSIDE = 2
+const val RANK_INITIALS = 3
+const val RANK_LOOSE = 4
+
+/** The ranking itself, on names already normalized; [q] too. Kept free of Android types so it can be unit tested. */
+internal fun <T> rankMatches(items: List<T>, q: String, nameOf: (T) -> String): List<Pair<Int, T>> {
+    if (q.isEmpty()) return emptyList()
+    val ranked = ArrayList<Pair<Int, T>>()
+    for (item in items) {
+        val name = nameOf(item)
         val words = name.split(' ', '-', '_', '.', ':').filter { it.isNotEmpty() }
         val rank = when {
-            name.startsWith(q) -> 0
-            words.any { it.startsWith(q) } -> 1
-            name.contains(q) -> 2
-            words.size > 1 && words.map { it[0] }.joinToString("").startsWith(q) -> 3
-            q.length >= 3 && isSubsequence(q, name) -> 4
+            name.startsWith(q) -> RANK_START
+            words.any { it.startsWith(q) } -> RANK_WORD
+            name.contains(q) -> RANK_INSIDE
+            words.size > 1 && words.map { it[0] }.joinToString("").startsWith(q) -> RANK_INITIALS
+            q.length >= 3 && isSubsequence(q, name) -> RANK_LOOSE
             else -> continue
         }
-        ranked += rank to app
+        ranked += rank to item
     }
-    return ranked.sortedBy { it.first }.map { it.second } // stable: alphabetical within a rank
+    return ranked.sortedBy { it.first } // stable: alphabetical within a rank
+}
+
+/**
+ * The one app "Open when one app is left" opens, or null. Initials and loose in-order matches
+ * widen the list for typos, but they must not hide an answer that is clear by name (issue 53):
+ * when exactly one app has the query in its name, that is the one. Only when no name contains
+ * the query does a single loose match count.
+ */
+internal fun <T> soleMatch(ranked: List<Pair<Int, T>>): T? {
+    val byName = ranked.filter { it.first <= RANK_INSIDE }
+    return byName.ifEmpty { ranked }.singleOrNull()?.second
 }
 
 private fun isSubsequence(needle: String, haystack: String): Boolean {
