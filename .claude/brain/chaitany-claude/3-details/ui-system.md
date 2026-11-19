@@ -6,7 +6,13 @@ icons. Everything is built from a handful of primitives.
 ## Palette and primitives
 `ui/theme/Theme.kt`: `FocusColors(bg, fg, dim, faint, line)`; `BlackTheme` (#000/#FFF/8E8E8E/
 565656/2A2A2A) and `WhiteTheme` (inverted). Locals: `LocalFocusColors`, `LocalFocusFont`
-(Default / Serif / Monospace), `LocalTextScale`. `applyFocusWindow()` = edge-to-edge, window
+(Default / Serif / Monospace / the user's imported TTF/OTF), `LocalTextScale`.
+**Custom font** (`ui/theme/CustomFont.kt`): one slot, copied to `files/fonts/custom` and checked
+with `Typeface.Builder(file).build()` (null = not a font; the old file stays). `Settings.customFontName`
+is only the label. A missing file falls back to `FontFamily.Default`, and Appearance then shows Sans. The split clock's "00:00"
+em width is measured with `Paint` for it instead of the fixed 2.75 / 3.1. The picker opens `*/*`
+because providers often label fonts `application/octet-stream`; validation is the filter. One
+file means one weight: Light/Medium/Bold are synthesised by Compose unless the font is variable. `applyFocusWindow()` = edge-to-edge, window
 background, optional hidden status bar, and asks for the panel's fastest refresh mode.
 `ui/components/Basics.kt`: `T()` is the only text primitive (theme colour, font, scale);
 `Label`, `Hairline`, `FocusSwitch` (drawn), `FocusButton` (filled = inverted, or outlined),

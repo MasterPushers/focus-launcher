@@ -2,6 +2,10 @@ package com.focus.launcher.ui.settings
 
 import com.focus.launcher.ui.home.MusicAppPicker
 import android.Manifest
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -48,7 +52,11 @@ import com.focus.launcher.ui.home.ClockTapDialog
 import com.focus.launcher.ui.home.clockTapLabel
 import com.focus.launcher.ui.home.shortcutLabel
 import com.focus.launcher.ui.launchApp
+import com.focus.launcher.ui.theme.CustomFont
 import com.focus.launcher.ui.theme.LocalFocusColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 private fun update(transform: (Settings) -> Settings) = Graph.settings.update(transform)
@@ -324,11 +332,31 @@ private val TEXT_SIZES = listOf(0.9f to "Small", 1f to "Default", 1.1f to "Large
 internal fun AppearancePage(settings: Settings, onBack: () -> Unit) {
     var dialog by remember { mutableStateOf(LookDialog.NONE) }
     val close = { dialog = LookDialog.NONE }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // The system file picker: no permission. Fonts often arrive as application/octet-stream, so any
+    // file may be picked; CustomFont.import refuses what Android cannot load as a font.
+    val pickFont = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) { CustomFont.import(context, uri) }
+            if (ok) {
+                update { it.copy(font = FontChoice.CUSTOM, customFontName = displayName(context, uri)) }
+            } else {
+                Toast.makeText(context, "That is not a TTF or OTF font", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    val customLabel = settings.customFontName.ifEmpty { FontChoice.CUSTOM.label }
+    // A custom font whose file is gone (e.g. settings restored on another phone) is shown as Sans,
+    // which is what FocusTheme falls back to.
+    val hasCustom = CustomFont.exists(context)
+    val shownFont = if (settings.font == FontChoice.CUSTOM && !hasCustom) FontChoice.SANS else settings.font
 
     Page("Appearance", onBack) {
         Section("Black and white")
         SettingRow("Theme", subtitle = "Pure black saves battery on OLED screens.", value = if (settings.dark) "Black" else "White", onClick = { dialog = LookDialog.THEME })
-        SettingRow("Typeface", value = settings.font.label, onClick = { dialog = LookDialog.FONT })
+        SettingRow("Typeface", value = if (shownFont == FontChoice.CUSTOM) customLabel else shownFont.label, onClick = { dialog = LookDialog.FONT })
         SettingRow("Text size", value = TEXT_SIZES.firstOrNull { it.first == settings.textScale }?.second ?: "Default", onClick = { dialog = LookDialog.SIZE })
 
         Section("Screen")
@@ -344,7 +372,16 @@ internal fun AppearancePage(settings: Settings, onBack: () -> Unit) {
     when (dialog) {
         LookDialog.NONE -> Unit
         LookDialog.THEME -> ChoiceDialog("Theme", listOf(true to "Black", false to "White"), settings.dark, close) { v -> update { it.copy(dark = v) } }
-        LookDialog.FONT -> ChoiceDialog("Typeface", FontChoice.entries.map { it to it.label }, settings.font, close) { v -> update { it.copy(font = v) } }
+        LookDialog.FONT -> {
+            // null = "choose a font file"; Custom is listed only once a font has been imported.
+            val options: List<Pair<FontChoice?, String>> =
+                listOf(FontChoice.SANS, FontChoice.SERIF, FontChoice.MONO).map { it to it.label } +
+                    (if (hasCustom) listOf(FontChoice.CUSTOM to customLabel) else emptyList()) +
+                    (null to "Choose a font file…")
+            ChoiceDialog("Typeface", options, shownFont, close, subtitle = "Your own font: a TTF or OTF file.") { v ->
+                if (v == null) pickFont.launch(arrayOf("*/*")) else update { it.copy(font = v) }
+            }
+        }
         LookDialog.LAUNCH -> ChoiceDialog("Opening apps", LaunchAnimation.entries.map { it to it.label }, settings.launchAnimation, close) { v -> update { it.copy(launchAnimation = v) } }
         LookDialog.SIZE -> ChoiceDialog("Text size", TEXT_SIZES, settings.textScale, close) { v -> update { it.copy(textScale = v) } }
     }
@@ -388,3 +425,12 @@ internal fun SwipeRightRow(settings: Settings) {
         )
     }
 }
+
+/** The picked file's name as the file manager shows it, for the Typeface row. */
+private fun displayName(context: Context, uri: Uri): String = try {
+    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+        if (c.moveToFirst()) c.getString(0) else null
+    }
+} catch (_: Exception) {
+    null
+}?.substringBeforeLast('.') ?: FontChoice.CUSTOM.label

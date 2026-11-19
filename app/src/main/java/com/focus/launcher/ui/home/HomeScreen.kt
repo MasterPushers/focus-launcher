@@ -98,6 +98,7 @@ import com.focus.launcher.ui.components.hasColourGlyphs
 import com.focus.launcher.ui.components.monochrome
 import com.focus.launcher.ui.components.press
 import com.focus.launcher.ui.launchOptions
+import com.focus.launcher.ui.theme.CustomFont
 import com.focus.launcher.ui.theme.LocalFocusColors
 import com.focus.launcher.util.Perms
 import java.time.LocalDate
@@ -270,7 +271,13 @@ fun HomeScreen(
         }
         val halfWidth = (maxWidth.value - 36f) / 2f - 30f // column padding, then the half's own padding
         val amPmWidth = if (use24h) 0f else 26f * textScale
-        val emsWide = if (settings.font == FontChoice.MONO) 3.1f else 2.75f
+        val emsWide = remember(settings.font, settings.customFontName) {
+            when (settings.font) {
+                FontChoice.MONO -> 3.1f
+                FontChoice.CUSTOM -> CustomFont.typeface(context)?.let(CustomFont::emsWide) ?: 2.75f
+                else -> 2.75f
+            }
+        }
         val splitTimeSp = ((halfWidth - amPmWidth) / emsWide / textScale).coerceIn(30f, 56f)
 
         fun heightOf(fit: Fit): Float {

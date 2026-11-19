@@ -95,6 +95,12 @@ Built with Kotlin and Jetpack Compose, without the Material library, in about 6,
   renames, hidden apps, timers, theme) to one small JSON file where you choose; Restore settings
   reads one back. Screen-time history is not part of it.
 
+**Your own typeface**
+- Settings → Appearance → Typeface offers Sans, Serif, Mono, or "Choose a font file…": any TTF or
+  OTF on the phone, picked through the system file picker (no permission). Focus keeps a copy, so
+  the original can be moved or deleted; a new pick replaces it. The font file is not part of the
+  settings backup: after a restore on another phone, Focus uses Sans until the font is picked again.
+
 ## How apps are sorted into "social", "game" and the rest
 
 Android's own label cannot be used as is. Its `CATEGORY_SOCIAL` officially means *"messaging,
