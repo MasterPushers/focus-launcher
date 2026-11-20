@@ -22,6 +22,12 @@ enum class LaunchAnimation(val label: String) { FAST("Fast"), SYSTEM("System def
 
 enum class HomeAlign(val label: String) { LEFT("Left"), CENTER("Center"), RIGHT("Right") }
 
+/**
+ * Where the fast apps sit on a tall home screen: HIGH just under the clock and the sections,
+ * MIDDLE where the original layout puts them, LOW just above the corner shortcuts.
+ */
+enum class AppBlock(val label: String) { HIGH("High"), MIDDLE("Middle"), LOW("Low") }
+
 /** Order of the app list in the drawer. */
 enum class DrawerSort(val label: String) { ALPHA("A–Z"), MOST_USED("Most used"), RECENT("Recent") }
 
@@ -41,6 +47,18 @@ const val TAP_BATTERY = "tap:battery"
 const val TAP_NOTHING = "tap:none"
 
 /**
+ * What a swipe on the home screen does. A swipe action is one of these strings, or an
+ * [AppEntry.key] to open; [ACTION_NOTHING] leaves the swipe unused.
+ */
+const val ACTION_NOTHING = "act:none"
+const val ACTION_DRAWER = "act:drawer"
+const val ACTION_SEARCH = "act:search"
+const val ACTION_WEB_SEARCH = "act:websearch"
+const val ACTION_NOTIFICATIONS = "act:notifications"
+const val ACTION_SETTINGS = "act:settings"
+const val ACTION_LOCK = "act:lock"
+
+/**
  * Every user-facing preference of the launcher. Immutable; changed through [SettingsStore.update].
  *
  * App references ([favorites], [hidden], [renames], shortcuts) use [AppEntry.key].
@@ -53,6 +71,10 @@ data class Settings(
     val textScale: Float = 1f,
     val hideStatusBar: Boolean = false,
     val launchAnimation: LaunchAnimation = LaunchAnimation.FAST,
+    /** Draw the phone's wallpaper behind the home screen, still in black and white text. */
+    val showWallpaper: Boolean = false,
+    /** Veil over the wallpaper (the theme's background colour), so the text stays readable. */
+    val wallpaperDim: Float = 0.55f,
 
     // Home
     val clockStyle: ClockStyle = ClockStyle.SPLIT,
@@ -84,6 +106,10 @@ data class Settings(
     /** With a notes app chosen: a link to one page in it (what its "copy link" gives). Blank = the app's own start screen. */
     val noteLink: String = "",
     val homeAlign: HomeAlign = HomeAlign.CENTER,
+    /** Where the fast apps sit in the empty height of a tall screen. */
+    val appBlock: AppBlock = AppBlock.MIDDLE,
+    /** Extra space between two fast apps, in dp: 0 keeps the list tight. */
+    val fastAppSpacing: Int = 0,
     val favorites: List<String> = emptyList(),
     val showShortcuts: Boolean = true,
     val leftShortcut: String = SHORTCUT_PHONE,
@@ -124,12 +150,14 @@ data class Settings(
     val reviewHour: Int = 20,
 
     // Gestures
-    val swipeDownNotifications: Boolean = true,
-    val swipeUpSearch: Boolean = true,
-    /** Swipe towards the page left of home (finger moves right): the phone's web search. */
-    val swipeRightSearch: Boolean = true,
-    /** [AppEntry.key] of the app that swipe right opens. "" = the web search. */
-    val swipeRightApp: String = "",
+    /** What a swipe towards the page left of home (finger moves left) does. */
+    val swipeLeftAction: String = ACTION_DRAWER,
+    /** What a swipe towards the page right of home (finger moves right) does. */
+    val swipeRightAction: String = ACTION_WEB_SEARCH,
+    /** What a swipe up on empty space does. */
+    val swipeUpAction: String = ACTION_SEARCH,
+    /** What a swipe down on empty space does. */
+    val swipeDownAction: String = ACTION_NOTIFICATIONS,
     val doubleTapLock: Boolean = true,
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
@@ -139,6 +167,8 @@ data class Settings(
         put("textScale", textScale.toDouble())
         put("hideStatusBar", hideStatusBar)
         put("launchAnimation", launchAnimation.name)
+        put("showWallpaper", showWallpaper)
+        put("wallpaperDim", wallpaperDim.toDouble())
 
         put("clockStyle", clockStyle.name)
         put("splitSide", splitSide.name)
@@ -157,6 +187,8 @@ data class Settings(
         put("noteApp", noteApp)
         put("noteLink", noteLink)
         put("homeAlign", homeAlign.name)
+        put("appBlock", appBlock.name)
+        put("fastAppSpacing", fastAppSpacing)
         put("favorites", JSONArray(favorites))
         put("showShortcuts", showShortcuts)
         put("leftShortcut", leftShortcut)
@@ -186,10 +218,10 @@ data class Settings(
         put("weekStartsMonday", weekStartsMonday)
         put("reviewHour", reviewHour)
 
-        put("swipeDownNotifications", swipeDownNotifications)
-        put("swipeUpSearch", swipeUpSearch)
-        put("swipeRightSearch", swipeRightSearch)
-        put("swipeRightApp", swipeRightApp)
+        put("swipeLeftAction", swipeLeftAction)
+        put("swipeRightAction", swipeRightAction)
+        put("swipeUpAction", swipeUpAction)
+        put("swipeDownAction", swipeDownAction)
         put("doubleTapLock", doubleTapLock)
     }
 
@@ -206,6 +238,9 @@ data class Settings(
                 textScale = o.optDouble("textScale", d.textScale.toDouble()).toFloat().coerceIn(0.8f, 1.4f),
                 hideStatusBar = o.optBoolean("hideStatusBar", d.hideStatusBar),
                 launchAnimation = enumOr(o.optString("launchAnimation"), d.launchAnimation),
+                showWallpaper = o.optBoolean("showWallpaper", d.showWallpaper),
+                wallpaperDim = o.optDouble("wallpaperDim", d.wallpaperDim.toDouble()).toFloat()
+                    .takeIf { it.isFinite() }?.coerceIn(0f, 0.9f) ?: d.wallpaperDim,
 
                 // Schema 2 made the split clock the default, at the owner's request. A ring stored by an
                 // older version was the old default, not a choice, so it moves along once; the ring stays
@@ -235,6 +270,8 @@ data class Settings(
                 noteApp = o.optString("noteApp", d.noteApp),
                 noteLink = o.optString("noteLink", d.noteLink),
                 homeAlign = enumOr(o.optString("homeAlign"), d.homeAlign),
+                appBlock = enumOr(o.optString("appBlock"), d.appBlock),
+                fastAppSpacing = o.optInt("fastAppSpacing", d.fastAppSpacing).coerceIn(0, 24),
                 favorites = o.optJSONArray("favorites").strings().take(MAX_FAVORITES),
                 showShortcuts = o.optBoolean("showShortcuts", d.showShortcuts),
                 leftShortcut = o.optString("leftShortcut", d.leftShortcut),
@@ -264,10 +301,22 @@ data class Settings(
                 weekStartsMonday = o.optBoolean("weekStartsMonday", d.weekStartsMonday),
                 reviewHour = o.optInt("reviewHour", d.reviewHour).coerceIn(0, 23),
 
-                swipeDownNotifications = o.optBoolean("swipeDownNotifications", d.swipeDownNotifications),
-                swipeUpSearch = o.optBoolean("swipeUpSearch", d.swipeUpSearch),
-                swipeRightSearch = o.optBoolean("swipeRightSearch", d.swipeRightSearch),
-                swipeRightApp = o.optString("swipeRightApp", d.swipeRightApp),
+                // Gestures: an install from before the swipe actions has only the old toggles and
+                // the one app swipe right opened; its choices are carried over once.
+                swipeLeftAction = o.optString("swipeLeftAction").ifEmpty { ACTION_DRAWER },
+                swipeRightAction = o.optString("swipeRightAction").ifEmpty {
+                    when {
+                        !o.optBoolean("swipeRightSearch", true) -> ACTION_NOTHING
+                        o.optString("swipeRightApp").isNotEmpty() -> o.optString("swipeRightApp")
+                        else -> ACTION_WEB_SEARCH
+                    }
+                },
+                swipeUpAction = o.optString("swipeUpAction").ifEmpty {
+                    if (o.optBoolean("swipeUpSearch", true)) ACTION_SEARCH else ACTION_NOTHING
+                },
+                swipeDownAction = o.optString("swipeDownAction").ifEmpty {
+                    if (o.optBoolean("swipeDownNotifications", true)) ACTION_NOTIFICATIONS else ACTION_NOTHING
+                },
                 doubleTapLock = o.optBoolean("doubleTapLock", d.doubleTapLock),
             )
         }

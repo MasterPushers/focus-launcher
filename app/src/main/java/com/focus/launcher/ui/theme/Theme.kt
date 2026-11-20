@@ -1,6 +1,8 @@
 package com.focus.launcher.ui.theme
 
 import android.os.Build
+import android.graphics.PixelFormat
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
@@ -75,7 +77,7 @@ val LocalFocusFont = staticCompositionLocalOf<FontFamily> { FontFamily.Default }
 val LocalTextScale = staticCompositionLocalOf { 1f }
 
 @Composable
-fun FocusTheme(settings: Settings, content: @Composable () -> Unit) {
+fun FocusTheme(settings: Settings, wallpaper: Boolean = false, content: @Composable () -> Unit) {
     val colors = if (settings.dark) BlackTheme else WhiteTheme
     val font = when (settings.font) {
         FontChoice.SANS -> FontFamily.Default
@@ -90,16 +92,28 @@ fun FocusTheme(settings: Settings, content: @Composable () -> Unit) {
     ) {
         // testTagsAsResourceId: the emulator tests (UI Automator) can find elements by their test
         // tag (ui/TestTags.kt). It adds nothing to what is drawn or announced.
-        Box(Modifier.fillMaxSize().background(colors.bg).semantics { testTagsAsResourceId = true }) { content() }
+        val background = if (wallpaper) colors.bg.copy(alpha = settings.wallpaperDim) else colors.bg
+        Box(Modifier.fillMaxSize().background(background).semantics { testTagsAsResourceId = true }) { content() }
     }
 }
 
 /** Transparent bars over a black (or white) window, and the optional hidden status bar. */
-fun ComponentActivity.applyFocusWindow(dark: Boolean, hideStatusBar: Boolean = false) {
+fun ComponentActivity.applyFocusWindow(dark: Boolean, hideStatusBar: Boolean = false, wallpaper: Boolean = false) {
     val transparent = android.graphics.Color.TRANSPARENT
     val style = if (dark) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent, transparent)
     enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
-    window.setBackgroundDrawable((if (dark) android.graphics.Color.BLACK else android.graphics.Color.WHITE).toDrawable())
+    if (wallpaper) {
+        window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
+    } else {
+        window.clearFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
+    }
+    window.setBackgroundDrawable(
+        (if (wallpaper) transparent else if (dark) android.graphics.Color.BLACK else android.graphics.Color.WHITE).toDrawable(),
+    )
+    // A transparent drawable alone is not a guarantee of a translucent Surface on every device.
+    // If it stays opaque, transparent frames become black/white until a press forces a redraw.
+    window.setFormat(if (wallpaper) PixelFormat.TRANSLUCENT else PixelFormat.OPAQUE)
+    window.decorView.invalidate()
 
     preferHighestRefreshRate()
 

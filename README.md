@@ -47,6 +47,8 @@ Built with Kotlin and Jetpack Compose, without the Material library, in about 6,
   Settings → Home screen keeps it there always) and a **note** of a few lines that you tap to edit.
 - Up to 5 "fast apps", as plain text. One that lives in a Work profile carries a small
   briefcase outline after its name, drawn in the text colour: the launcher's one pictogram.
+  Optional High / Middle / Low placement and extra row spacing are under Settings → Home screen;
+  Middle and no extra spacing preserve the original layout.
 - Two corner shortcuts (Phone / Camera by default). Long-press one to change it.
 - Everything you touch lights up softly and fades back (no ripples, no colour).
 - Gestures: swipe left = app drawer, swipe right = the phone's web search (the Google search box
@@ -54,6 +56,12 @@ Built with Kotlin and Jetpack Compose, without the Material library, in about 6,
   swipe down = notifications, long-press empty space = settings, double tap = lock (on by default;
   needs the timer service). The swipes other than the drawer's, and the double tap, can be
   switched off in Settings → Gestures.
+  Each swipe can also be reassigned to the drawer, app search, web search, notifications,
+  Focus settings, screen lock, any app, or nothing. Drawer motion follows the triggering
+  direction; Restore default swipes brings the original actions back.
+- Optional system wallpaper with a light, medium, or heavy veil is under Settings → Appearance.
+  It is off by default; the drawer and settings stay opaque. Android displays the wallpaper
+  directly, without storage or wallpaper-reading permissions.
 
 **App drawer** (page 2)
 - Search bar, "installed in the last 24 hours", then every app alphabetically with an A–Z scrubber.

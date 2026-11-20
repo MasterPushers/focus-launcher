@@ -9,5 +9,6 @@ object TestTags {
     const val HOME_PAGE = "home_page"
     const val APP_LIST = "app_list"
     const val APP_SEARCH = "app_search"
+    const val DRAWER_PAGER = "drawer_pager"
     const val WALL = "wall"
 }

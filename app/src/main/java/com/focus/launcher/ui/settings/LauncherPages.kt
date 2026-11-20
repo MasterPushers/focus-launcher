@@ -22,6 +22,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focus.launcher.Graph
+import com.focus.launcher.data.ACTION_DRAWER
+import com.focus.launcher.data.ACTION_LOCK
+import com.focus.launcher.data.ACTION_NOTHING
+import com.focus.launcher.data.ACTION_NOTIFICATIONS
+import com.focus.launcher.data.ACTION_SEARCH
+import com.focus.launcher.data.ACTION_SETTINGS
+import com.focus.launcher.data.ACTION_WEB_SEARCH
 import com.focus.launcher.data.AppEntry
 import com.focus.launcher.data.CALENDAR_ALL
 import com.focus.launcher.data.CalendarInfo
@@ -37,6 +44,7 @@ import com.focus.launcher.data.SHORTCUT_PHONE
 import com.focus.launcher.data.Settings
 import com.focus.launcher.data.SplitSide
 import com.focus.launcher.data.TimeFormat
+import com.focus.launcher.data.AppBlock
 import com.focus.launcher.ui.components.AppPickerDialog
 import com.focus.launcher.ui.components.ChoiceDialog
 import com.focus.launcher.ui.components.FocusDialog
@@ -46,6 +54,7 @@ import com.focus.launcher.ui.components.T
 import com.focus.launcher.ui.components.ToggleRow
 import com.focus.launcher.ui.home.ClockTapDialog
 import com.focus.launcher.ui.home.clockTapLabel
+import com.focus.launcher.ui.home.homeActionLabel
 import com.focus.launcher.ui.home.shortcutLabel
 import com.focus.launcher.ui.launchApp
 import com.focus.launcher.ui.theme.LocalFocusColors
@@ -55,7 +64,7 @@ private fun update(transform: (Settings) -> Settings) = Graph.settings.update(tr
 
 // ---- Home screen -----------------------------------------------------------------------------
 
-private enum class HomeDialog { NONE, CLOCK, SPLIT_SIDE, RING, TAP, TIME_FORMAT, ALIGN, LEFT, RIGHT, CALENDAR, MUSIC_APP, NOTE_APP }
+private enum class HomeDialog { NONE, CLOCK, SPLIT_SIDE, RING, TAP, TIME_FORMAT, ALIGN, SPREAD, SPACING, LEFT, RIGHT, CALENDAR, MUSIC_APP, NOTE_APP }
 
 @Composable
 internal fun HomePage(settings: Settings, apps: List<AppEntry>, onBack: () -> Unit, go: (String) -> Unit) {
@@ -170,6 +179,18 @@ internal fun HomePage(settings: Settings, apps: List<AppEntry>, onBack: () -> Un
         Section("Fast apps")
         SettingRow("Fast apps", subtitle = "Up to $MAX_FAVORITES apps, one tap from the home screen.", value = "$favoriteCount / $MAX_FAVORITES", onClick = { go(Routes.FAST_APPS) })
         SettingRow("Alignment", value = settings.homeAlign.label, onClick = { dialog = HomeDialog.ALIGN })
+        SettingRow(
+            "Where the apps sit",
+            subtitle = "High keeps them just under the clock, Low just above the bottom corners.",
+            value = settings.appBlock.label,
+            onClick = { dialog = HomeDialog.SPREAD },
+        )
+        SettingRow(
+            "Spacing between apps",
+            subtitle = "More room between two fast apps: easier to hit the right one with a thumb.",
+            value = APP_SPACING.firstOrNull { it.first == settings.fastAppSpacing }?.second ?: "${settings.fastAppSpacing} dp",
+            onClick = { dialog = HomeDialog.SPACING },
+        )
 
         Section("Corner shortcuts")
         ToggleRow("Show shortcuts", settings.showShortcuts) { v -> update { it.copy(showShortcuts = v) } }
@@ -201,6 +222,8 @@ internal fun HomePage(settings: Settings, apps: List<AppEntry>, onBack: () -> Un
         )
         HomeDialog.TIME_FORMAT -> ChoiceDialog("Time format", TimeFormat.entries.map { it to it.label }, settings.timeFormat, close) { v -> update { it.copy(timeFormat = v) } }
         HomeDialog.ALIGN -> ChoiceDialog("Alignment", HomeAlign.entries.map { it to it.label }, settings.homeAlign, close) { v -> update { it.copy(homeAlign = v) } }
+        HomeDialog.SPREAD -> ChoiceDialog("Where the apps sit", AppBlock.entries.map { it to it.label }, settings.appBlock, close) { v -> update { it.copy(appBlock = v) } }
+        HomeDialog.SPACING -> ChoiceDialog("Spacing between apps", APP_SPACING.map { it.first to it.second }, settings.fastAppSpacing, close) { v -> update { it.copy(fastAppSpacing = v) } }
         HomeDialog.MUSIC_APP -> MusicAppPicker(
             apps = apps.filter { it.key !in settings.hidden },
             subtitle = null,
@@ -316,9 +339,15 @@ internal fun HiddenAppsPage(settings: Settings, apps: List<AppEntry>, onBack: ()
 
 // ---- Appearance ------------------------------------------------------------------------------
 
-private enum class LookDialog { NONE, THEME, FONT, SIZE, LAUNCH }
+private enum class LookDialog { NONE, THEME, FONT, SIZE, LAUNCH, DIM }
+
+/** How much of the wallpaper the veil hides. */
+private val VEILS = listOf(0.35f to "Light", 0.55f to "Medium", 0.75f to "Heavy")
 
 private val TEXT_SIZES = listOf(0.9f to "Small", 1f to "Default", 1.1f to "Large", 1.2f to "Larger")
+
+/** Extra room between two fast apps, in dp. */
+private val APP_SPACING = listOf(0 to "Tight", 4 to "Small", 8 to "Medium", 12 to "Large", 16 to "Larger", 24 to "Widest")
 
 @Composable
 internal fun AppearancePage(settings: Settings, onBack: () -> Unit) {
@@ -339,6 +368,20 @@ internal fun AppearancePage(settings: Settings, onBack: () -> Unit) {
             onClick = { dialog = LookDialog.LAUNCH },
         )
         ToggleRow("Hide the status bar", settings.hideStatusBar, subtitle = "No notification icons on the home screen. Swipe down from the top edge to peek.") { v -> update { it.copy(hideStatusBar = v) } }
+
+        Section("Wallpaper")
+        ToggleRow(
+            "Show the wallpaper", settings.showWallpaper,
+            subtitle = "Your phone's wallpaper behind the home screen, under a veil so the text stays readable. The app drawer stays plain.",
+        ) { v -> update { it.copy(showWallpaper = v) } }
+        if (settings.showWallpaper) {
+            SettingRow(
+                "Veil over it",
+                subtitle = "Thicker keeps the clock and the apps easier to read over a busy picture.",
+                value = VEILS.firstOrNull { it.first == settings.wallpaperDim }?.second ?: "Medium",
+                onClick = { dialog = LookDialog.DIM },
+            )
+        }
     }
 
     when (dialog) {
@@ -347,44 +390,120 @@ internal fun AppearancePage(settings: Settings, onBack: () -> Unit) {
         LookDialog.FONT -> ChoiceDialog("Typeface", FontChoice.entries.map { it to it.label }, settings.font, close) { v -> update { it.copy(font = v) } }
         LookDialog.LAUNCH -> ChoiceDialog("Opening apps", LaunchAnimation.entries.map { it to it.label }, settings.launchAnimation, close) { v -> update { it.copy(launchAnimation = v) } }
         LookDialog.SIZE -> ChoiceDialog("Text size", TEXT_SIZES, settings.textScale, close) { v -> update { it.copy(textScale = v) } }
+        LookDialog.DIM -> ChoiceDialog("Veil over the wallpaper", VEILS, settings.wallpaperDim, close) { v -> update { it.copy(wallpaperDim = v) } }
     }
 }
 
 // ---- Gestures --------------------------------------------------------------------------------
 
+private enum class GestureDialog { NONE, LEFT, RIGHT, UP, DOWN }
+
 @Composable
 internal fun GesturesPage(settings: Settings, status: SetupStatus, onBack: () -> Unit, go: (String) -> Unit) {
+    val apps by Graph.apps.apps.collectAsStateWithLifecycle()
+    var dialog by remember { mutableStateOf(GestureDialog.NONE) }
+    val close = { dialog = GestureDialog.NONE }
+    val set: (String) -> Unit = { spec ->
+        update {
+            when (dialog) {
+                GestureDialog.LEFT -> it.copy(swipeLeftAction = spec)
+                GestureDialog.RIGHT -> it.copy(swipeRightAction = spec)
+                GestureDialog.UP -> it.copy(swipeUpAction = spec)
+                GestureDialog.DOWN -> it.copy(swipeDownAction = spec)
+                GestureDialog.NONE -> it
+            }
+        }
+        close()
+    }
+
     Page("Gestures", onBack) {
-        Note("Swiping left always opens the app drawer, and a long-press on empty space opens these settings.")
-        ToggleRow("Swipe down for notifications", settings.swipeDownNotifications) { v -> update { it.copy(swipeDownNotifications = v) } }
-        ToggleRow("Swipe up to search", settings.swipeUpSearch, subtitle = "Jumps to the drawer with the keyboard open.") { v -> update { it.copy(swipeUpSearch = v) } }
+        Note("Directions mean the way your finger moves. Each home-screen swipe can run a different action. Long-press empty space for settings.")
+        SettingRow(
+            "Swipe left",
+            subtitle = if (settings.swipeLeftAction == ACTION_DRAWER) "The app drawer, following your finger." else "Choose an action or any app.",
+            value = homeActionLabel(settings.swipeLeftAction, apps),
+            onClick = { dialog = GestureDialog.LEFT },
+        )
+        SettingRow(
+            "Swipe right",
+            subtitle = "Any app, the web search, the drawer, or nothing at all.",
+            value = homeActionLabel(settings.swipeRightAction, apps),
+            onClick = { dialog = GestureDialog.RIGHT },
+        )
+        SettingRow(
+            "Swipe up",
+            subtitle = "Up from the empty space below the clock.",
+            value = homeActionLabel(settings.swipeUpAction, apps),
+            onClick = { dialog = GestureDialog.UP },
+        )
+        SettingRow(
+            "Swipe down",
+            subtitle = "Down from the empty space below the clock.",
+            value = homeActionLabel(settings.swipeDownAction, apps),
+            onClick = { dialog = GestureDialog.DOWN },
+        )
         // Also under App drawer. It is looked for here too: it is what swiping to the drawer does.
         ToggleRow("Keyboard opens with the drawer", settings.autoKeyboard, subtitle = "Start typing the moment you swipe to your apps.") { v -> update { it.copy(autoKeyboard = v) } }
-        ToggleRow("Swipe right", settings.swipeRightSearch, subtitle = "Opens the app below, or the web search, like the page left of a stock home screen.") { v -> update { it.copy(swipeRightSearch = v) } }
-        if (settings.swipeRightSearch) {
-            SwipeRightRow(settings)
-        }
         ToggleRow("Double tap to lock", settings.doubleTapLock, subtitle = "Turns the screen off. Uses the Focus timer service.") { v -> update { it.copy(doubleTapLock = v) } }
         if (settings.doubleTapLock && !status.timerService) {
             Note("The Focus timer service is off, so double tap cannot lock yet.  Open setup  →") { go(Routes.SETUP) }
         }
+        SettingRow("Restore default swipes", subtitle = "Left: drawer. Right: web search. Up: app search. Down: notifications.", onClick = {
+            update {
+                it.copy(
+                    swipeLeftAction = ACTION_DRAWER,
+                    swipeRightAction = ACTION_WEB_SEARCH,
+                    swipeUpAction = ACTION_SEARCH,
+                    swipeDownAction = ACTION_NOTIFICATIONS,
+                )
+            }
+        })
+    }
+
+    if (dialog != GestureDialog.NONE) {
+        val which = when (dialog) {
+            GestureDialog.RIGHT -> "Swipe right"
+            GestureDialog.UP -> "Swipe up"
+            GestureDialog.DOWN -> "Swipe down"
+            else -> "Swipe left"
+        }
+        AppPickerDialog(
+            title = which,
+            subtitle = "A launcher action, or any app to open.",
+            apps = apps.filter { it.key !in settings.hidden },
+            leadingDetail = null,
+            leading = GESTURE_ACTIONS.map { (label, spec) -> label to { set(spec) } },
+            onDismiss = close,
+            onPick = { app -> set(app.key) },
+        )
     }
 }
 
-/** Which app swipe right opens: any app, or the web search. Shared by Settings → Gestures and the welcome screen. */
+/** The named actions a swipe can be given, above the list of apps. */
+private val GESTURE_ACTIONS = listOf(
+    "App drawer" to ACTION_DRAWER,
+    "App search" to ACTION_SEARCH,
+    "Web search" to ACTION_WEB_SEARCH,
+    "Notifications" to ACTION_NOTIFICATIONS,
+    "Focus settings" to ACTION_SETTINGS,
+    "Lock the screen" to ACTION_LOCK,
+    "Nothing" to ACTION_NOTHING,
+)
+
+/** Which action swipe right runs. Shared by Settings → Gestures and the welcome screen. */
 @Composable
 internal fun SwipeRightRow(settings: Settings) {
     val apps by Graph.apps.apps.collectAsStateWithLifecycle()
     var picking by remember { mutableStateOf(false) }
-    val current = apps.firstOrNull { it.key == settings.swipeRightApp }?.label ?: "Web search"
-    SettingRow("Swipe right opens", subtitle = "Any app, or the web search.", value = current, onClick = { picking = true })
+    SettingRow("Swipe right opens", subtitle = "Any app, or the web search.", value = homeActionLabel(settings.swipeRightAction, apps), onClick = { picking = true })
     if (picking) {
         AppPickerDialog(
             title = "Swipe right opens",
             apps = apps.filter { it.key !in settings.hidden },
+            leadingDetail = null,
+            leading = GESTURE_ACTIONS.map { (label, spec) -> label to { update { it.copy(swipeRightAction = spec) } } },
             onDismiss = { picking = false },
-            leading = listOf("Web search" to { update { it.copy(swipeRightApp = "") } }),
-            onPick = { app -> update { it.copy(swipeRightApp = app.key) } },
+            onPick = { app -> update { it.copy(swipeRightAction = app.key) } },
         )
     }
 }

@@ -6,6 +6,22 @@ import org.junit.Test
 
 class HomeJourney : Journey() {
     @Test
+    fun swipeUpOpensTheDrawerWithTheSidewaysSwipeDisabled() {
+        Given.swipeUpOpensDrawer()
+        home.openAppListUp()
+        home.pressHome().isShown()
+    }
+
+    @Test
+    fun wallpaperSurfaceIsRestoredAfterUsingAnotherApp() {
+        Given.fastApps(MAIL)
+        Given.wallpaperWithAnOpaqueSurface()
+        home.openFastApp(MAIL)
+        app.isOpen(MAIL)
+        home.pressHome().isShown().wallpaperSurfaceIsReady()
+    }
+
+    @Test
     fun homeButtonBringsBackTheHomePageFromTheAppList() {
         home.openAppList()
         home.pressHome().isShown()
