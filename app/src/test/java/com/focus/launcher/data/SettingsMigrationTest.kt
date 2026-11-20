@@ -48,4 +48,70 @@ class SettingsMigrationTest {
     @Test fun `an unknown stored value falls back to the default`() {
         assertEquals(SplitSide.CALENDAR, Settings.fromJson(stored(version = 2, style = "SPLIT").put("splitSide", "MAIL")).splitSide)
     }
+
+    /**
+     * The four swipes used to be three on/off switches and the app swipe right opened. An install
+     * from before the swipe actions must land on exactly what it had.
+     */
+    @Test fun `an old install keeps what its swipes did`() {
+        val allOn = Settings().toJson()
+            .apply { remove("swipeLeftAction"); remove("swipeRightAction"); remove("swipeUpAction"); remove("swipeDownAction") }
+        val migrated = Settings.fromJson(allOn)
+        assertEquals(ACTION_DRAWER, migrated.swipeLeftAction)
+        assertEquals(ACTION_WEB_SEARCH, migrated.swipeRightAction)
+        assertEquals(ACTION_SEARCH, migrated.swipeUpAction)
+        assertEquals(ACTION_NOTIFICATIONS, migrated.swipeDownAction)
+
+        val off = Settings().toJson().apply {
+            remove("swipeLeftAction"); remove("swipeRightAction"); remove("swipeUpAction"); remove("swipeDownAction")
+            put("swipeUpSearch", false); put("swipeDownNotifications", false); put("swipeRightSearch", false)
+        }
+        assertEquals(ACTION_NOTHING, Settings.fromJson(off).swipeUpAction)
+        assertEquals(ACTION_NOTHING, Settings.fromJson(off).swipeDownAction)
+        assertEquals(ACTION_NOTHING, Settings.fromJson(off).swipeRightAction)
+    }
+
+    @Test fun `the app swipe right opened is carried over`() {
+        val old = Settings().toJson().apply {
+            remove("swipeLeftAction"); remove("swipeRightAction"); remove("swipeUpAction"); remove("swipeDownAction")
+            put("swipeRightApp", "com.example.mail")
+        }
+        assertEquals("com.example.mail", Settings.fromJson(old).swipeRightAction)
+    }
+
+    @Test fun `the swipe actions and the home layout survive a round trip`() {
+        val s = Settings(
+            swipeLeftAction = ACTION_NOTHING,
+            swipeRightAction = "com.example.app",
+            swipeUpAction = ACTION_DRAWER,
+            swipeDownAction = ACTION_SETTINGS,
+            appBlock = AppBlock.LOW,
+            fastAppSpacing = 12,
+            showWallpaper = true,
+            wallpaperDim = 0.75f,
+        )
+        assertEquals(s, Settings.fromJson(s.toJson()))
+    }
+
+    @Test fun `new actions take precedence over legacy toggles`() {
+        val old = JSONObject()
+            .put("swipeRightSearch", false)
+            .put("swipeRightAction", ACTION_DRAWER)
+            .put("swipeUpSearch", true)
+            .put("swipeUpAction", ACTION_NOTHING)
+        val settings = Settings.fromJson(old)
+        assertEquals(ACTION_DRAWER, settings.swipeRightAction)
+        assertEquals(ACTION_NOTHING, settings.swipeUpAction)
+    }
+
+    @Test fun `out of range layout and wallpaper values are bounded`() {
+        val settings = Settings.fromJson(JSONObject()
+            .put("fastAppSpacing", 1000)
+            .put("appBlock", "INVALID")
+            .put("wallpaperDim", 12.0))
+        assertEquals(24, settings.fastAppSpacing)
+        assertEquals(AppBlock.MIDDLE, settings.appBlock)
+        assertEquals(0.9f, settings.wallpaperDim)
+        assertEquals(0, Settings.fromJson(JSONObject().put("fastAppSpacing", -1)).fastAppSpacing)
+    }
 }

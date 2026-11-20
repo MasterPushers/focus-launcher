@@ -22,7 +22,6 @@ import com.focus.launcher.ui.components.MenuRow
 import com.focus.launcher.ui.components.Hairline
 import com.focus.launcher.ui.components.TextInputDialog
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.database.ContentObserver
@@ -72,12 +71,17 @@ import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import com.focus.launcher.Graph
 import com.focus.launcher.data.AppEntry
+import com.focus.launcher.data.ACTION_NOTHING
+import com.focus.launcher.data.ACTION_DRAWER
+import com.focus.launcher.data.ACTION_NOTIFICATIONS
+import com.focus.launcher.data.ACTION_SEARCH
 import com.focus.launcher.data.CalEvent
 import com.focus.launcher.data.CalendarInfo
 import com.focus.launcher.data.CalendarRepository
 import com.focus.launcher.data.ClockStyle
 import com.focus.launcher.data.DayUsage
 import com.focus.launcher.data.FontChoice
+import com.focus.launcher.data.AppBlock
 import com.focus.launcher.data.SHORTCUT_CAMERA
 import com.focus.launcher.data.SHORTCUT_PHONE
 import com.focus.launcher.data.Settings
@@ -98,6 +102,7 @@ import com.focus.launcher.ui.components.hasColourGlyphs
 import com.focus.launcher.ui.components.monochrome
 import com.focus.launcher.ui.components.press
 import com.focus.launcher.ui.launchOptions
+import com.focus.launcher.ui.DrawerOrigin
 import com.focus.launcher.ui.theme.LocalFocusColors
 import com.focus.launcher.util.Perms
 import java.time.LocalDate
@@ -121,7 +126,7 @@ fun HomeScreen(
     resumeCount: Int,
     onLaunch: (AppEntry) -> Unit,
     onAppMenu: (AppEntry) -> Unit,
-    onOpenDrawer: (focusSearch: Boolean) -> Unit,
+    onOpenDrawer: (focusSearch: Boolean, origin: DrawerOrigin) -> Unit,
     onOpenSettings: (route: String?) -> Unit,
     onOpenReview: (week: LocalDate?) -> Unit,
 ) {
@@ -132,6 +137,7 @@ fun HomeScreen(
     // The gesture detectors below outlive recompositions, so they must call the latest callbacks.
     val openDrawer by rememberUpdatedState(onOpenDrawer)
     val openSettings by rememberUpdatedState(onOpenSettings)
+    val launch by rememberUpdatedState(onLaunch)
 
     // Calendar section data
     var calendarAccess by remember { mutableStateOf(CalendarRepository.hasAccess(context)) }
@@ -177,9 +183,16 @@ fun HomeScreen(
     var choosingClockTap by remember { mutableStateOf(false) }
     val tip by Graph.state.tip.collectAsStateWithLifecycle()
     // A tip about something that is not on the screen teaches nothing: pass over it.
-    LaunchedEffect(tip, settings.showMusic, settings.showNote, settings.showShortcuts, settings.favorites.size) {
+    LaunchedEffect(
+        tip, settings.showMusic, settings.showNote, settings.showShortcuts, settings.favorites.size,
+        settings.swipeLeftAction, settings.swipeRightAction, settings.swipeUpAction, settings.swipeDownAction,
+    ) {
         val absent = (tip == Tip.SECTION_APPS && !settings.showMusic && !settings.showNote) || (tip == Tip.CORNERS && !settings.showShortcuts) ||
-            (tip == Tip.FAST_APPS && settings.favorites.size < 2)
+            (tip == Tip.FAST_APPS && settings.favorites.size < 2) ||
+            (tip == Tip.SWIPE_LEFT && settings.swipeLeftAction != ACTION_DRAWER) ||
+            (tip == Tip.SWIPE_RIGHT && settings.swipeRightAction != com.focus.launcher.data.ACTION_WEB_SEARCH) ||
+            (tip == Tip.SWIPE_UP && settings.swipeUpAction != ACTION_SEARCH) ||
+            (tip == Tip.SWIPE_DOWN && settings.swipeDownAction != ACTION_NOTIFICATIONS)
         if (absent) Graph.state.nextTip()
     }
     var editingNote by remember { mutableStateOf(false) }
@@ -208,7 +221,10 @@ fun HomeScreen(
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .pointerInput(settings.swipeDownNotifications, settings.swipeUpSearch) {
+            .pointerInput(settings.swipeDownAction, settings.swipeUpAction, apps) {
+                val down = settings.swipeDownAction
+                val up = settings.swipeUpAction
+                if (down == ACTION_NOTHING && up == ACTION_NOTHING) return@pointerInput
                 val threshold = 64.dp.toPx()
                 var dragged = 0f
                 var fired = false
@@ -216,15 +232,22 @@ fun HomeScreen(
                     onDragStart = { dragged = 0f; fired = false },
                     onVerticalDrag = { _, dy ->
                         dragged += dy
-                        if (!fired && dragged > threshold && settings.swipeDownNotifications) {
-                            fired = true
-                            expandNotifications(context)
-                            Graph.state.did(Tip.SWIPE_DOWN)
-                        } else if (!fired && dragged < -threshold && settings.swipeUpSearch) {
-                            fired = true
-                            openDrawer(true)
-                            Graph.state.did(Tip.SWIPE_UP)
+                        if (fired) return@detectVerticalDragGestures
+                        val spec = when {
+                            dragged > threshold -> down
+                            dragged < -threshold -> up
+                            else -> return@detectVerticalDragGestures
                         }
+                        if (spec == ACTION_NOTHING) return@detectVerticalDragGestures
+                        fired = true
+                        runHomeAction(
+                            context, spec, apps, launch,
+                            { search -> openDrawer(search, if (dragged < 0) DrawerOrigin.BOTTOM else DrawerOrigin.TOP) },
+                            openSettings,
+                        )
+                        // The tips only go away when the gesture still does what they teach.
+                        if (spec == ACTION_NOTIFICATIONS) Graph.state.did(Tip.SWIPE_DOWN)
+                        if (spec == ACTION_SEARCH) Graph.state.did(Tip.SWIPE_UP)
                     },
                 )
             }
@@ -292,7 +315,7 @@ fun HomeScreen(
             val sectionCount = listOf(settings.showCalendar && !sideCalendar, musicVisible, settings.showNote).count { it }
             val lines = if (sectionCount > 0) (sectionCount + 1) * 1f else 0f
             val shortcuts = if (settings.showShortcuts) 28f + 20f * textScale else 20f
-            val rows = rowCount * (fit.textSp * 1.2f * textScale + fit.padDp * 2)
+            val rows = rowCount * (fit.textSp * 1.2f * textScale + fit.padDp * 2) + (rowCount - 1) * settings.fastAppSpacing
             val screenTime = if (sideScreenTime) 0f else 25f + 64f * textScale // gap, title, total, share of the day
             return clock + screenTime + noticeLines + calendar + musicHeight + note + lines + rows + shortcuts + 6f + 36f // 36 = air
         }
@@ -313,6 +336,19 @@ fun HomeScreen(
             Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 18.dp),
             horizontalAlignment = settings.homeAlign.horizontal(),
         ) {
+            // The sections, one under the other as in the owner's sketch: calendar, music, note. No
+            // boxes: a line above each and one below the last, the same line the split clock uses.
+            val calendarSection = settings.showCalendar && !sideCalendar
+            val anySection = calendarSection || musicVisible || settings.showNote
+
+            // How the empty height is shared out. Middle is the original layout; a tall screen
+            // leaves the apps low, which is what High and Low are for.
+            val (beforeAppsGap, bottomGap) = when (settings.appBlock) {
+                AppBlock.HIGH -> 0.20f to 2.6f
+                AppBlock.MIDDLE -> (if (anySection) 0.9f else 0.6f) to 1f
+                AppBlock.LOW -> 2.6f to 0.20f
+            }
+
             // The split clock is a header: it sits near the top. The ring floats lower, as a centrepiece.
             Spacer(Modifier.weight(if (split) 0.35f else 0.9f))
 
@@ -387,10 +423,6 @@ fun HomeScreen(
 
             Spacer(Modifier.weight(0.8f))
 
-            // The sections, one under the other as in the owner's sketch: calendar, music, note. No
-            // boxes: a line above each and one below the last, the same line the split clock uses.
-            val calendarSection = settings.showCalendar && !sideCalendar
-            val anySection = calendarSection || musicVisible || settings.showNote
             if (calendarSection) {
                 Hairline(Modifier.padding(horizontal = 12.dp), c.faint)
                 CalendarWidget(
@@ -431,17 +463,17 @@ fun HomeScreen(
             }
             if (anySection) Hairline(Modifier.padding(horizontal = 12.dp), c.faint)
 
-            Spacer(Modifier.weight(if (anySection) 0.9f else 0.6f))
+            Spacer(Modifier.weight(beforeAppsGap))
 
             // Fast apps
             if (favorites.isEmpty()) {
                 T(
-                    "Swipe left for your apps.\nLong-press one to pin it here.",
-                    Modifier.fillMaxWidth().clickable { onOpenDrawer(false) }.padding(horizontal = 12.dp, vertical = 8.dp),
+                    "Tap here for your apps.\nLong-press one to pin it here.",
+                    Modifier.fillMaxWidth().clickable { onOpenDrawer(false, DrawerOrigin.RIGHT) }.padding(horizontal = 12.dp, vertical = 8.dp),
                     size = 15.sp, color = c.dim, align = settings.homeAlign.text(), lineHeight = 23.sp,
                 )
             } else {
-                for (app in favorites) key(app.key) {
+                for ((i, app) in favorites.withIndex()) key(app.key) {
                     val lifted = draggingKey == app.key
                     Row(
                         Modifier
@@ -500,7 +532,13 @@ fun HomeScreen(
                                 }
                             }
                             .press { onLaunch(app) }
-                            .padding(vertical = favoritePadding, horizontal = 12.dp),
+                            .padding(
+                                start = 12.dp,
+                                end = 12.dp,
+                                // Extra room between two apps, never above the first.
+                                top = favoritePadding + if (i == 0) 0.dp else settings.fastAppSpacing.dp,
+                                bottom = favoritePadding,
+                            ),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         T(
@@ -517,7 +555,7 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.weight(bottomGap))
 
             // Corner shortcuts
             if (settings.showShortcuts) {
@@ -750,16 +788,5 @@ private fun performClockTap(
         )
         TAP_NOTHING -> Unit
         else -> apps.firstOrNull { it.key == spec }?.let(onLaunch)
-    }
-}
-
-/** Pulls the notification shade down: via the timer service when it is on, else the status-bar service. */
-@SuppressLint("WrongConstant", "PrivateApi")
-private fun expandNotifications(context: Context) {
-    if (FocusAccessibilityService.openNotifications()) return
-    try {
-        val statusBar = context.getSystemService("statusbar")
-        Class.forName("android.app.StatusBarManager").getMethod("expandNotificationsPanel").invoke(statusBar)
-    } catch (_: Exception) {
     }
 }

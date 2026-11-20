@@ -3,6 +3,8 @@ package com.focus.launcher.e2e.support
 import android.content.ComponentName
 import com.focus.launcher.Graph
 import com.focus.launcher.data.Settings
+import com.focus.launcher.data.ACTION_DRAWER
+import com.focus.launcher.data.ACTION_NOTHING
 import com.focus.launcher.service.FocusAccessibilityService
 import kotlin.math.ceil
 import kotlin.time.Duration.Companion.seconds
@@ -29,6 +31,16 @@ object Given {
     fun fastApps(vararg apps: FixtureApp) {
         val keys = apps.map { app -> Graph.apps.apps.value.first { it.packageName == app.packageName }.key }
         Graph.settings.update { it.copy(favorites = keys) }
+    }
+
+    fun swipeUpOpensDrawer() {
+        Graph.settings.update { it.copy(swipeLeftAction = ACTION_NOTHING, swipeUpAction = ACTION_DRAWER) }
+    }
+
+    fun wallpaperWithAnOpaqueSurface() {
+        Graph.settings.update { it.copy(showWallpaper = true) }
+        Device.waitUntil("wallpaper settings applied", 15.seconds) { HomeWindow.wallpaperSurfaceReady() }
+        HomeWindow.makeOpaque()
     }
 
     /**

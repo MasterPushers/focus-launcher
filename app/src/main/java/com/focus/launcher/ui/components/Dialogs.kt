@@ -274,6 +274,8 @@ fun AppPickerDialog(
     onDismiss: () -> Unit,
     subtitle: String? = null,
     leading: List<Pair<String, () -> Unit>> = emptyList(),
+    /** The small word after each [leading] row; null leaves it out. */
+    leadingDetail: String? = "default",
     /** A last row that keeps the dialog open, e.g. "All apps…" under a shortened list. */
     more: Pair<String, () -> Unit>? = null,
     onPick: (AppEntry) -> Unit,
@@ -294,7 +296,7 @@ fun AppPickerDialog(
         LazyColumn(Modifier.weight(1f)) {
             if (query.text.isBlank()) {
                 items(leading, key = { "leading:" + it.first }) { (label, action) ->
-                    MenuRow(label, detail = "default") {
+                    MenuRow(label, detail = leadingDetail) {
                         action()
                         onDismiss()
                     }

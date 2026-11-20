@@ -9,9 +9,9 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -33,17 +34,24 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.focus.launcher.data.ACTION_DRAWER
+import com.focus.launcher.data.ACTION_NOTHING
+import com.focus.launcher.data.ACTION_SEARCH
+import com.focus.launcher.data.ACTION_WEB_SEARCH
 import com.focus.launcher.data.AppEntry
 import com.focus.launcher.data.Settings
 import com.focus.launcher.service.WeeklyReview
 import com.focus.launcher.ui.drawer.AppMenu
 import com.focus.launcher.ui.TestTags
+import com.focus.launcher.ui.DrawerOrigin
+import com.focus.launcher.ui.DrawerPager
 import com.focus.launcher.ui.drawer.DrawerScreen
 import com.focus.launcher.ui.home.HomeScreen
 import com.focus.launcher.ui.home.homeDragging
+import com.focus.launcher.ui.home.runHomeAction
 import com.focus.launcher.ui.launchApp
-import com.focus.launcher.ui.openWebSearch
 import com.focus.launcher.ui.theme.FocusTheme
+import com.focus.launcher.ui.theme.LocalFocusColors
 import com.focus.launcher.ui.theme.applyFocusWindow
 import com.focus.launcher.util.Perms
 import kotlin.math.abs
@@ -53,13 +61,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 
-/** The home screen (page 0) and, one swipe to the left, the app drawer (page 1). */
+/** The home screen (page 0) and the drawer (page 1), opening along the chosen swipe's axis. */
 class MainActivity : ComponentActivity() {
     private val homePresses = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Graph.settings.value.let { applyFocusWindow(it.dark, it.hideStatusBar) }
+        Graph.settings.value.let { applyFocusWindow(it.dark, it.hideStatusBar, it.showWallpaper) }
         // First start ever: the introduction, once. Marked as seen here already, so that pressing
         // Home in the middle of it never brings it back.
         if (savedInstanceState == null && !Graph.state.tutorialSeen) {
@@ -68,8 +76,10 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val settings by Graph.settings.flow.collectAsStateWithLifecycle()
-            LaunchedEffect(settings.dark, settings.hideStatusBar) { applyFocusWindow(settings.dark, settings.hideStatusBar) }
-            FocusTheme(settings) { Launcher(settings, homePresses) }
+            LaunchedEffect(settings.dark, settings.hideStatusBar, settings.showWallpaper) {
+                applyFocusWindow(settings.dark, settings.hideStatusBar, settings.showWallpaper)
+            }
+            FocusTheme(settings, wallpaper = settings.showWallpaper) { Launcher(settings, homePresses) }
         }
     }
 
@@ -77,6 +87,12 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         // The Home button while the launcher is already showing: go back to page 0.
         if (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_HOME)) homePresses.tryEmit(Unit)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Reapply the window/surface contract on every return, not just a settings change.
+        Graph.settings.value.let { applyFocusWindow(it.dark, it.hideStatusBar, it.showWallpaper) }
     }
 }
 
@@ -94,6 +110,8 @@ private fun Launcher(settings: Settings, homePresses: Flow<Unit>) {
     val tip by Graph.state.tip.collectAsStateWithLifecycle()
 
     val pager = rememberPagerState { 2 }
+    var drawerOrigin by remember { mutableStateOf(DrawerOrigin.RIGHT) }
+    var pendingDrawerOpen by remember { mutableStateOf(false) }
     // The drawer counts as open from the moment a swipe is let go towards it: not halfway through
     // the drag, where the finger can still turn back (the keyboard used to pop up and drop again),
     // and not only once the page has settled (the keyboard would come late). So the keyboard
@@ -135,6 +153,7 @@ private fun Launcher(settings: Settings, homePresses: Flow<Unit>) {
             query = ""
             menuApp = null
             wantsSearchFocus = false
+            pendingDrawerOpen = false
             scope.launch { pager.scrollToPage(0) }
         }
     }
@@ -146,26 +165,49 @@ private fun Launcher(settings: Settings, homePresses: Flow<Unit>) {
         homePresses.collect {
             menuApp = null
             query = ""
+            pendingDrawerOpen = false
             if (pager.currentPage != 0) pager.animateScrollToPage(0)
         }
     }
 
     // A launcher is never "backed out of": back only returns from the drawer to home.
     BackHandler {
+        pendingDrawerOpen = false
         if (pager.currentPage != 0) scope.launch { pager.animateScrollToPage(0) }
     }
 
     val launch: (AppEntry) -> Unit = { entry -> launchApp(context, scope, entry) }
-    // The app swipe right opens, if the user chose one; null means the web search.
-    val swipeRightEntry = remember(apps, settings.swipeRightApp) { apps.firstOrNull { it.key == settings.swipeRightApp } }
+    // The drawer can be reached by any swipe; while it is on the drawer side of home the pager
+    // keeps its own drag (the page follows the finger). Every other horizontal swipe is read here.
+    val drawerIsLeft = settings.swipeLeftAction == ACTION_DRAWER
+    val openDrawer by rememberUpdatedState<(Boolean, DrawerOrigin) -> Unit> { focusSearch, origin ->
+        wantsSearchFocus = focusSearch
+        drawerOrigin = origin
+        pendingDrawerOpen = true
+    }
+    // Run after the new pager orientation is composed, so its very first frame moves on that axis.
+    LaunchedEffect(pendingDrawerOpen, drawerOrigin) {
+        if (pendingDrawerOpen) {
+            pager.animateScrollToPage(1)
+            pendingDrawerOpen = false
+        }
+    }
+    LaunchedEffect(pager.settledPage, pendingDrawerOpen) {
+        if (pager.settledPage == 0 && !pager.isScrollInProgress && !pendingDrawerOpen) {
+            drawerOrigin = DrawerOrigin.RIGHT
+        }
+    }
+    val launchLatest by rememberUpdatedState(launch)
+    val background = LocalFocusColors.current.bg
 
-    HorizontalPager(
+    DrawerPager(
+        origin = drawerOrigin,
         state = pager,
         // There is no page to the left of home, so the pager ignores that swipe. Watch it on the
-        // way down (Initial pass, nothing consumed) and open the web search instead, the way the
-        // page left of a stock home screen does.
-        modifier = Modifier.fillMaxSize().pointerInput(settings.swipeRightSearch, swipeRightEntry) {
-            if (!settings.swipeRightSearch) return@pointerInput
+        // way down (Initial pass, nothing consumed) and run the action the user chose instead.
+        modifier = Modifier.fillMaxSize().pointerInput(settings.swipeLeftAction, settings.swipeRightAction, apps) {
+            val left = settings.swipeLeftAction
+            val right = settings.swipeRightAction
             val threshold = 72.dp.toPx()
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -174,20 +216,27 @@ private fun Launcher(settings: Settings, homePresses: Flow<Unit>) {
                 while (true) {
                     val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
                     if (!change.pressed) break
-                    if (homeDragging.value) break // a fast app is being dragged: no web search from a sideways wobble
+                    if (homeDragging.value) break // a fast app is being dragged: no action from a sideways wobble
                     val moved = change.position - down.position
-                    if (moved.x > threshold && moved.x > abs(moved.y) * 2) {
-                        val entry = swipeRightEntry
-                        if (entry != null) launch(entry) else openWebSearch(context)
-                        Graph.state.did(Tip.SWIPE_RIGHT)
-                        break
+                    val sideways = abs(moved.x) > threshold && abs(moved.x) > abs(moved.y) * 2
+                    if (!sideways) continue
+                    val spec = if (moved.x > 0) right else left
+                    if (moved.x < 0 && drawerIsLeft && drawerOrigin == DrawerOrigin.RIGHT) break
+                    if (spec != ACTION_NOTHING) {
+                        change.consume()
+                        runHomeAction(
+                            context, spec, apps, launchLatest,
+                            { search -> openDrawer(search, if (moved.x < 0) DrawerOrigin.RIGHT else DrawerOrigin.LEFT) },
+                        ) { route -> context.startActivity(SettingsActivity.intent(context, route)) }
+                        if (spec == ACTION_WEB_SEARCH) Graph.state.did(Tip.SWIPE_RIGHT)
+                        if (spec == ACTION_DRAWER || spec == ACTION_SEARCH) Graph.state.did(Tip.SWIPE_LEFT)
                     }
+                    break
                 }
             }
         },
-        beyondViewportPageCount = 1,
-        userScrollEnabled = !homeDragging.value,
-        key = { it },
+        userScrollEnabled = !homeDragging.value &&
+            (pager.settledPage != 0 || (drawerIsLeft && drawerOrigin == DrawerOrigin.RIGHT)),
     ) { page ->
         // The page being left fades and sinks back a touch while the other one arrives. Done in
         // graphicsLayer, which runs in the draw phase: the swipe never triggers a recomposition.
@@ -202,7 +251,7 @@ private fun Launcher(settings: Settings, homePresses: Flow<Unit>) {
                 val scale = 1f - 0.05f * distance
                 scaleX = scale
                 scaleY = scale
-            },
+            }.then(if (page == 1) Modifier.background(background) else Modifier),
         ) {
             if (page == 0) {
                 HomeScreen(
@@ -215,10 +264,7 @@ private fun Launcher(settings: Settings, homePresses: Flow<Unit>) {
                     resumeCount = resumeCount,
                     onLaunch = launch,
                     onAppMenu = { Graph.state.did(Tip.APP_MENU); menuApp = it },
-                    onOpenDrawer = { focusSearch ->
-                        wantsSearchFocus = focusSearch
-                        scope.launch { pager.animateScrollToPage(1) }
-                    },
+                    onOpenDrawer = openDrawer,
                     onOpenSettings = { route -> context.startActivity(SettingsActivity.intent(context, route)) },
                     onOpenReview = { week -> context.startActivity(ReviewActivity.intent(context, week)) },
                 )
