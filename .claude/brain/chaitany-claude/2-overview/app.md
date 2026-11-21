@@ -75,6 +75,9 @@ ui/     theme/ components/ home/ drawer/ block/ review/ settings/   + Launching.
 - **`TRIM_MEMORY_UI_HIDDEN` fires on every app launch**; never clear caches there.
 - Compose lint is strict here: no `Locale.getDefault()` or `StateFlow.value` in composables
   (use `currentLocale()` and `collectAsStateWithLifecycle`).
+- **No user-visible text in Kotlin.** All of it lives in `res/values/strings*.xml` (`strings.xml`
+  for services, data and formatting, `strings_<area>.xml` per screen; Polish in `values-pl/`). A new
+  language is one more `values-<qualifier>` folder and no code: see `TRANSLATING.md`.
 
 ## Quality bar
 7 emulator tests (`app/src/androidTest/.../e2e`, real app as home screen, UI Automator; run with
